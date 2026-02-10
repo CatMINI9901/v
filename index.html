@@ -2,18 +2,64 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<title>camera test</title>
+<title>MediaPipe Hands SAFE</title>
+<style>
+  body { margin:0; background:#000; }
+  video, canvas {
+    position:absolute;
+    width:640px;
+    height:480px;
+  }
+</style>
 </head>
 <body>
-<video id="v" autoplay playsinline></video>
+
+<video id="video" autoplay playsinline></video>
+<canvas id="canvas"></canvas>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+
 <script>
-navigator.mediaDevices.getUserMedia({ video: true })
-  .then(stream => {
-    v.srcObject = stream;
-  })
-  .catch(err => {
-    document.body.innerText = err;
-  });
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+canvas.width = 640;
+canvas.height = 480;
+
+const hands = new Hands({
+  locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
+});
+
+hands.setOptions({
+  maxNumHands: 2,
+  modelComplexity: 1
+});
+
+hands.onResults(results => {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.drawImage(results.image,0,0,canvas.width,canvas.height);
+
+  if (results.multiHandLandmarks) {
+    for (const lm of results.multiHandLandmarks) {
+      drawConnectors(ctx, lm, HAND_CONNECTIONS, {color:"#0ff"});
+      drawLandmarks(ctx, lm, {color:"#f0f"});
+    }
+  }
+});
+
+const camera = new Camera(video, {
+  width: 640,
+  height: 480,
+  onFrame: async () => {
+    await hands.send({ image: video });
+  }
+});
+
+camera.start();
 </script>
+
 </body>
 </html>
