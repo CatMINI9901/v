@@ -2,11 +2,19 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<title>MediaPipe Hands SAFE</title>
+<title>MediaPipe ALL FINAL</title>
 <style>
-  body { margin:0; background:#000; }
+  body { margin:0; background:#000; overflow:hidden; }
   video, canvas {
     position:absolute;
+    top:0; left:0;
+    width:640px;
+    height:480px;
+  }
+  #three {
+    position:absolute;
+    right:0;
+    top:0;
     width:640px;
     height:480px;
   }
@@ -16,49 +24,117 @@
 
 <video id="video" autoplay playsinline></video>
 <canvas id="canvas"></canvas>
+<div id="three"></div>
 
+<!-- MediaPipe -->
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+
+<!-- Three.js -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 
 <script>
+/* ================= basic ================= */
 const video = document.getElementById("video");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
-
 canvas.width = 640;
 canvas.height = 480;
+
+/* ================= Three.js ================= */
+const scene = new THREE.Scene();
+const camera3 = new THREE.PerspectiveCamera(70, 640/480, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(640,480);
+document.getElementById("three").appendChild(renderer.domElement);
+
+const cube = new THREE.Mesh(
+  new THREE.BoxGeometry(),
+  new THREE.MeshNormalMaterial()
+);
+scene.add(cube);
+camera3.position.z = 3;
+
+function animate() {
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera3);
+}
+animate();
+
+/* ================= Hands ================= */
+let handGesture = "none";
 
 const hands = new Hands({
   locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
 });
-
 hands.setOptions({
-  maxNumHands: 2,
+  maxNumHands: 1,
   modelComplexity: 1
 });
 
-hands.onResults(results => {
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.drawImage(results.image,0,0,canvas.width,canvas.height);
+hands.onResults(res => {
+  if (!res.multiHandLandmarks) return;
+  const lm = res.multiHandLandmarks[0];
 
-  if (results.multiHandLandmarks) {
-    for (const lm of results.multiHandLandmarks) {
-      drawConnectors(ctx, lm, HAND_CONNECTIONS, {color:"#0ff"});
-      drawLandmarks(ctx, lm, {color:"#f0f"});
-    }
+  drawConnectors(ctx, lm, HAND_CONNECTIONS, {color:"#0ff"});
+  drawLandmarks(ctx, lm, {color:"#f0f"});
+
+  // グー・パー判定（指先Yと付け根Y）
+  const tips = [8,12,16,20];
+  let open = 0;
+  for (const i of tips) {
+    if (lm[i].y < lm[i - 2].y) open++;
   }
+  handGesture = open >= 3 ? "open" : "fist";
+
+  // Three.js操作
+  if (handGesture === "open") cube.rotation.y += 0.05;
+  if (handGesture === "fist") cube.rotation.x += 0.05;
 });
 
-const camera = new Camera(video, {
+/* ================= Face ================= */
+let mouthOpen = false;
+
+const face = new FaceMesh({
+  locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`
+});
+face.setOptions({
+  maxNumFaces: 1,
+  refineLandmarks: true
+});
+
+face.onResults(res => {
+  if (!res.multiFaceLandmarks) return;
+  const lm = res.multiFaceLandmarks[0];
+
+  drawConnectors(ctx, lm, FACEMESH_LIPS, {color:"#f00"});
+
+  const upper = lm[13];
+  const lower = lm[14];
+  const dist = Math.abs(upper.y - lower.y);
+
+  mouthOpen = dist > 0.03;
+
+  // 口開閉で拡大縮小
+  cube.scale.setScalar(mouthOpen ? 1.5 : 1.0);
+});
+
+/* ================= Camera ================= */
+const cam = new Camera(video, {
   width: 640,
   height: 480,
   onFrame: async () => {
-    await hands.send({ image: video });
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.drawImage(video,0,0,canvas.width,canvas.height);
+
+    // 必ず直列
+    await hands.send({image: video});
+    await face.send({image: video});
   }
 });
-
-camera.start();
+cam.start();
 </script>
 
 </body>
