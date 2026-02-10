@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>キャラクター重ね表示</title>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+</head>
+<body>
+<video id="video" autoplay playsinline style="display:none;"></video>
+<canvas id="output"></canvas>
+
+<script>
+const video = document.getElementById('video');
+const canvas = document.getElementById('output');
+const ctx = canvas.getContext('2d');
+
+// シンプルキャラクター描画
+function drawCharacter(x, y, size = 40) {
+    ctx.fillStyle = 'orange';
+    ctx.beginPath();
+    ctx.arc(x, y - size/2, size/2, 0, 2*Math.PI); // 頭
+    ctx.fill();
+
+    ctx.strokeStyle = 'green';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(x, y);           // 体
+    ctx.lineTo(x, y + size);    
+    ctx.stroke();
+
+    // 両腕
+    ctx.beginPath();
+    ctx.moveTo(x, y + size/4);
+    ctx.lineTo(x - size/2, y + size/2);
+    ctx.moveTo(x, y + size/4)
+    ctx.lineTo(x + size/2, y + size/2);
+    ctx.stroke();
+
+    // 両足
+    ctx.beginPath();
+    ctx.moveTo(x, y + size);
+    ctx.lineTo(x - size/3, y + size + size/2);
+    ctx.moveTo(x, y + size);
+    ctx.lineTo(x + size/3, y + size + size/2);
+    ctx.stroke();
+}
+
+// MediaPipe Pose 設定
+const pose = new Pose({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`});
+pose.setOptions({modelComplexity: 1, smoothLandmarks: true});
+pose.onResults(onResults);
+
+// Webカメラ起動
+const camera = new Camera(video, {
+  onFrame: async () => { await pose.send({image: video}); },
+  width: 640,
+  height: 480
+});
+camera.start();
+
+function onResults(results) {
+    const w = video.videoWidth || 640;
+    const h = video.videoHeight || 480;
+    canvas.width = w;
+    canvas.height = h;
+    ctx.clearRect(0, 0, w, h);
+
+    // 背景にカメラ映像
+    ctx.drawImage(results.image, 0, 0, w, h);
+
+    // 骨格が取得できれば腰（24番）にキャラクター
+    let x = w/2, y = h/2; // デフォルト中央
+    if (results.poseLandmarks && results.poseLandmarks.length > 0) {
+        const hip = results.poseLandmarks[24];
+        x = hip.x * w;
+        y = hip.y * h;
+    }
+
+    drawCharacter(x, y, 40);
+}
+</script>
+</body>
+</html>
