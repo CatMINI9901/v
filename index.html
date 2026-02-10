@@ -1,84 +1,99 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>キャラクター重ね表示</title>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<meta charset="utf-8">
+<title>MediaPipe Hands Web Demo</title>
+<style>
+  body {
+    margin: 0;
+    background: #111;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+  }
+
+  .container {
+    position: relative;
+  }
+
+  video, canvas {
+    width: 640px;
+    height: 480px;
+    border-radius: 8px;
+  }
+
+  canvas {
+    position: absolute;
+    left: 0;
+    top: 0;
+  }
+</style>
 </head>
 <body>
-<video id="video" autoplay playsinline style="display:none;"></video>
-<canvas id="output"></canvas>
+
+<div class="container">
+  <video id="video" autoplay playsinline></video>
+  <canvas id="canvas"></canvas>
+</div>
+
+<!-- MediaPipe CDN -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
 
 <script>
-const video = document.getElementById('video');
-const canvas = document.getElementById('output');
-const ctx = canvas.getContext('2d');
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
 
-// シンプルキャラクター描画
-function drawCharacter(x, y, size = 40) {
-    ctx.fillStyle = 'orange';
-    ctx.beginPath();
-    ctx.arc(x, y - size/2, size/2, 0, 2*Math.PI); // 頭
-    ctx.fill();
+canvas.width = 640;
+canvas.height = 480;
 
-    ctx.strokeStyle = 'green';
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(x, y);           // 体
-    ctx.lineTo(x, y + size);    
-    ctx.stroke();
+// Hands 初期化
+const hands = new Hands({
+  locateFile: (file) => {
+    return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+  }
+});
 
-    // 両腕
-    ctx.beginPath();
-    ctx.moveTo(x, y + size/4);
-    ctx.lineTo(x - size/2, y + size/2);
-    ctx.moveTo(x, y + size/4)
-    ctx.lineTo(x + size/2, y + size/2);
-    ctx.stroke();
+hands.setOptions({
+  maxNumHands: 2,
+  modelComplexity: 1,
+  minDetectionConfidence: 0.7,
+  minTrackingConfidence: 0.7
+});
 
-    // 両足
-    ctx.beginPath();
-    ctx.moveTo(x, y + size);
-    ctx.lineTo(x - size/3, y + size + size/2);
-    ctx.moveTo(x, y + size);
-    ctx.lineTo(x + size/3, y + size + size/2);
-    ctx.stroke();
-}
+// 結果を描画
+hands.onResults(results => {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
 
-// MediaPipe Pose 設定
-const pose = new Pose({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`});
-pose.setOptions({modelComplexity: 1, smoothLandmarks: true});
-pose.onResults(onResults);
+  if (results.multiHandLandmarks) {
+    for (const landmarks of results.multiHandLandmarks) {
+      drawConnectors(ctx, landmarks, HAND_CONNECTIONS, {
+        color: "#00ffcc",
+        lineWidth: 4
+      });
+      drawLandmarks(ctx, landmarks, {
+        color: "#ff0055",
+        lineWidth: 2
+      });
+    }
+  }
+});
 
-// Webカメラ起動
+// カメラ起動
 const camera = new Camera(video, {
-  onFrame: async () => { await pose.send({image: video}); },
+  onFrame: async () => {
+    await hands.send({ image: video });
+  },
   width: 640,
   height: 480
 });
+
 camera.start();
-
-function onResults(results) {
-    const w = video.videoWidth || 640;
-    const h = video.videoHeight || 480;
-    canvas.width = w;
-    canvas.height = h;
-    ctx.clearRect(0, 0, w, h);
-
-    // 背景にカメラ映像
-    ctx.drawImage(results.image, 0, 0, w, h);
-
-    // 骨格が取得できれば腰（24番）にキャラクター
-    let x = w/2, y = h/2; // デフォルト中央
-    if (results.poseLandmarks && results.poseLandmarks.length > 0) {
-        const hip = results.poseLandmarks[24];
-        x = hip.x * w;
-        y = hip.y * h;
-    }
-
-    drawCharacter(x, y, 40);
-}
 </script>
+
 </body>
 </html>
