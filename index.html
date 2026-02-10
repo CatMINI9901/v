@@ -2,96 +2,125 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<title>MediaPipe Hands Web Demo</title>
+<title>MediaPipe ALL Demo</title>
 <style>
   body {
     margin: 0;
-    background: #111;
+    background: #0b0b0b;
     display: flex;
     justify-content: center;
     align-items: center;
     height: 100vh;
   }
 
-  .container {
+  .wrap {
     position: relative;
+    width: 960px;
+    height: 720px;
   }
 
   video, canvas {
-    width: 640px;
-    height: 480px;
-    border-radius: 8px;
-  }
-
-  canvas {
     position: absolute;
-    left: 0;
-    top: 0;
+    width: 960px;
+    height: 720px;
+    border-radius: 10px;
   }
 </style>
 </head>
 <body>
 
-<div class="container">
+<div class="wrap">
   <video id="video" autoplay playsinline></video>
   <canvas id="canvas"></canvas>
 </div>
 
-<!-- MediaPipe CDN -->
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+<!-- MediaPipe -->
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
 
 <script>
 const video = document.getElementById("video");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
-canvas.width = 640;
-canvas.height = 480;
+canvas.width = 960;
+canvas.height = 720;
 
-// Hands 初期化
+/* ================= Hands ================= */
 const hands = new Hands({
-  locateFile: (file) => {
-    return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
-  }
+  locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
 });
-
 hands.setOptions({
   maxNumHands: 2,
   modelComplexity: 1,
   minDetectionConfidence: 0.7,
   minTrackingConfidence: 0.7
 });
-
-// 結果を描画
-hands.onResults(results => {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
-
-  if (results.multiHandLandmarks) {
-    for (const landmarks of results.multiHandLandmarks) {
-      drawConnectors(ctx, landmarks, HAND_CONNECTIONS, {
-        color: "#00ffcc",
-        lineWidth: 4
-      });
-      drawLandmarks(ctx, landmarks, {
-        color: "#ff0055",
-        lineWidth: 2
-      });
-    }
+hands.onResults(res => {
+  if (!res.multiHandLandmarks) return;
+  for (const lm of res.multiHandLandmarks) {
+    drawConnectors(ctx, lm, HAND_CONNECTIONS, {color:"#00ffff", lineWidth:3});
+    drawLandmarks(ctx, lm, {color:"#ff0066", lineWidth:2});
   }
 });
 
-// カメラ起動
-const camera = new Camera(video, {
-  onFrame: async () => {
-    await hands.send({ image: video });
-  },
-  width: 640,
-  height: 480
+/* ================= Face ================= */
+const face = new FaceMesh({
+  locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`
+});
+face.setOptions({
+  maxNumFaces: 1,
+  refineLandmarks: true,
+  minDetectionConfidence: 0.7,
+  minTrackingConfidence: 0.7
+});
+face.onResults(res => {
+  if (!res.multiFaceLandmarks) return;
+  for (const lm of res.multiFaceLandmarks) {
+    drawConnectors(ctx, lm, FACEMESH_TESSELATION, {color:"#444"});
+    drawConnectors(ctx, lm, FACEMESH_RIGHT_EYE, {color:"#00ff00"});
+    drawConnectors(ctx, lm, FACEMESH_LEFT_EYE, {color:"#00ff00"});
+    drawConnectors(ctx, lm, FACEMESH_LIPS, {color:"#ff0000"});
+  }
 });
 
+/* ================= Pose ================= */
+const pose = new Pose({
+  locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`
+});
+pose.setOptions({
+  modelComplexity: 1,
+  smoothLandmarks: true,
+  minDetectionConfidence: 0.7,
+  minTrackingConfidence: 0.7
+});
+pose.onResults(res => {
+  if (!res.poseLandmarks) return;
+  drawConnectors(ctx, res.poseLandmarks, POSE_CONNECTIONS,
+    {color:"#ffaa00", lineWidth:4});
+  drawLandmarks(ctx, res.poseLandmarks,
+    {color:"#ffffff", lineWidth:2});
+});
+
+/* ================= Camera ================= */
+const camera = new Camera(video, {
+  width: 960,
+  height: 720,
+  onFrame: async () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    await Promise.all([
+      hands.send({image: video}),
+      face.send({image: video}),
+      pose.send({image: video})
+    ]);
+  }
+});
 camera.start();
 </script>
 
