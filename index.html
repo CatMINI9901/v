@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<title>MediaPipe REAL FINAL</title>
+<title>MediaPipe VISUAL DEBUG</title>
 <style>
   body { margin:0; background:#000; overflow:hidden; }
   video, canvas {
@@ -17,10 +17,21 @@
     width:640px;
     height:480px;
   }
+  #status {
+    position:absolute;
+    left:10px;
+    top:10px;
+    color:#0f0;
+    font-family:monospace;
+    background:rgba(0,0,0,0.6);
+    padding:6px 10px;
+    z-index:10;
+  }
 </style>
 </head>
 <body>
 
+<div id="status">init</div>
 <video id="video" autoplay playsinline></video>
 <canvas id="canvas"></canvas>
 <div id="three"></div>
@@ -31,21 +42,26 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 
 <script>
-/* ================= camera ================= */
+/* ========== camera ========== */
 const video = document.getElementById("video");
 navigator.mediaDevices.getUserMedia({ video: true })
   .then(s => video.srcObject = s);
 
-/* ================= canvas ================= */
+/* ========== canvas ========== */
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 canvas.width = 640;
 canvas.height = 480;
 
-/* ================= Three.js ================= */
+/* ========== status ========== */
+const status = document.getElementById("status");
+let handSeen = false;
+let faceSeen = false;
+
+/* ========== Three.js ========== */
 const scene = new THREE.Scene();
 const cam3 = new THREE.PerspectiveCamera(70, 640/480, 0.1, 100);
-const renderer = new THREE.WebGLRenderer();
+const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(640,480);
 document.getElementById("three").appendChild(renderer.domElement);
 
@@ -56,21 +72,24 @@ const cube = new THREE.Mesh(
 scene.add(cube);
 cam3.position.z = 3;
 
-(function threeLoop(){
-  requestAnimationFrame(threeLoop);
+(function render3(){
+  requestAnimationFrame(render3);
   renderer.render(scene, cam3);
 })();
 
-/* ================= MediaPipe ================= */
-let busy = false;
-let mode = 0;
-
+/* ========== Hands ========== */
 const hands = new Hands({
   locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
 });
 hands.setOptions({ maxNumHands:1, modelComplexity:0 });
+
 hands.onResults(r => {
-  if (!r.multiHandLandmarks) return;
+  if (!r.multiHandLandmarks) {
+    handSeen = false;
+    return;
+  }
+  handSeen = true;
+
   const lm = r.multiHandLandmarks[0];
   drawConnectors(ctx, lm, HAND_CONNECTIONS, {color:"#0ff"});
   drawLandmarks(ctx, lm, {color:"#f0f"});
@@ -78,27 +97,42 @@ hands.onResults(r => {
   const tips = [8,12,16,20];
   let open = 0;
   for (const i of tips) if (lm[i].y < lm[i-2].y) open++;
+
   cube.rotation.y += open >= 3 ? 0.05 : 0;
 });
 
+/* ========== Face ========== */
 const face = new FaceMesh({
   locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`
 });
 face.setOptions({ refineLandmarks:false });
+
 face.onResults(r => {
-  if (!r.multiFaceLandmarks) return;
+  if (!r.multiFaceLandmarks) {
+    faceSeen = false;
+    return;
+  }
+  faceSeen = true;
+
   const lm = r.multiFaceLandmarks[0];
   drawConnectors(ctx, lm, FACEMESH_LIPS, {color:"#f00"});
+
   const d = Math.abs(lm[13].y - lm[14].y);
   cube.scale.setScalar(d > 0.03 ? 1.5 : 1.0);
 });
 
-/* ================= main loop ================= */
+/* ========== main loop ========== */
+let busy = false;
+let mode = 0;
+
 async function loop() {
   requestAnimationFrame(loop);
 
   ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.drawImage(video,0,0,canvas.width,canvas.height);
+
+  status.textContent =
+    `hand:${handSeen} face:${faceSeen}`;
 
   if (busy) return;
   busy = true;
