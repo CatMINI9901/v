@@ -1,153 +1,325 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="utf-8">
-<title>MediaPipe VISUAL DEBUG</title>
-<style>
-  body { margin:0; background:#000; overflow:hidden; }
-  video, canvas {
-    position:absolute;
-    width:640px;
-    height:480px;
-  }
-  #three {
-    position:absolute;
-    right:0;
-    top:0;
-    width:640px;
-    height:480px;
-  }
-  #status {
-    position:absolute;
-    left:10px;
-    top:10px;
-    color:#0f0;
-    font-family:monospace;
-    background:rgba(0,0,0,0.6);
-    padding:6px 10px;
-    z-index:10;
-  }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PokoMobile Aero</title>
+    <style>
+        :root {
+            --glass: rgba(255, 255, 255, 0.2);
+            --border: rgba(255, 255, 255, 0.4);
+            --shadow: 0 15px 35px rgba(0,0,0,0.5);
+        }
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: none; /* スクロールや拡大を禁止 */
+        }
+        body {
+            background: radial-gradient(circle at top, #76c92d, #2d5a0a);
+            height: 100vh;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end; /* 盤面を下側に寄せる */
+            font-family: 'Arial Rounded MT Bold', sans-serif;
+            color: white;
+            padding-bottom: env(safe-area-inset-bottom, 20px);
+        }
+
+        /* ヘッダー・スコアエリア */
+        #ui-layer {
+            width: 90%;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            display: flex;
+            justify-content: space-around;
+            box-shadow: var(--shadow);
+        }
+        .stat-box { text-align: center; }
+        .stat-label { font-size: 12px; opacity: 0.8; }
+        .stat-val { font-size: 24px; font-weight: bold; display: block; }
+
+        /* ゲーム盤面 */
+        #grid-container {
+            position: relative;
+            width: 95vw;
+            height: 95vw;
+            max-width: 400px;
+            max-height: 400px;
+            margin-bottom: 20px;
+        }
+        #grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 6px;
+            padding: 10px;
+            background: rgba(0,0,0,0.2);
+            backdrop-filter: blur(15px);
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            width: 100%;
+            height: 100%;
+        }
+
+        .cell {
+            background: linear-gradient(145deg, rgba(255,255,255,0.3), rgba(255,255,255,0.1));
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 8vw; /* スマホ画面幅に合わせて調整 */
+            border: 1px solid rgba(255,255,255,0.2);
+            box-shadow: inset 0 2px 4px rgba(255,255,255,0.3);
+            transition: transform 0.1s;
+        }
+        @media (min-width: 400px) { .cell { font-size: 32px; } }
+
+        /* アニメーション */
+        .selected {
+            background: rgba(255,255,255,0.5) !important;
+            transform: scale(0.9);
+            box-shadow: 0 0 15px white;
+        }
+        .shake { animation: shake 0.3s ease-in-out; }
+        @keyframes shake {
+            0%, 100% { transform: translate(0,0); }
+            25% { transform: translate(5px, 5px); }
+            50% { transform: translate(-5px, -5px); }
+            75% { transform: translate(5px, -5px); }
+        }
+
+        #combo-text {
+            position: absolute;
+            top: 40%; left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 40px;
+            font-weight: bold;
+            color: #ffeb3b;
+            text-shadow: 0 0 10px rgba(0,0,0,0.5);
+            pointer-events: none;
+            opacity: 0;
+            z-index: 100;
+        }
+        .combo-anim { animation: comboPop 0.5s forwards; }
+        @keyframes comboPop {
+            0% { opacity:0; transform: translate(-50%, 0%) scale(0.5); }
+            50% { opacity:1; transform: translate(-50%, -50%) scale(1.3); }
+            100% { opacity:0; transform: translate(-50%, -100%) scale(1); }
+        }
+
+        /* モーダル */
+        #char-select {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(20px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background: var(--glass);
+            padding: 30px;
+            border-radius: 30px;
+            border: 1px solid var(--border);
+            text-align: center;
+        }
+        .char-btn { font-size: 50px; margin: 10px; cursor: pointer; display: inline-block; }
+    </style>
 </head>
 <body>
 
-<div id="status">init</div>
-<video id="video" autoplay playsinline></video>
-<canvas id="canvas"></canvas>
-<div id="three"></div>
+<div id="char-select">
+    <div class="modal-content">
+        <h3>Character</h3>
+        <div>
+            <span class="char-btn" onclick="selectChar('🐶')">🐶</span>
+            <span class="char-btn" onclick="selectChar('🐱')">🐱</span>
+            <span class="char-btn" onclick="selectChar('🐰')">🐰</span>
+        </div>
+    </div>
+</div>
 
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<div id="ui-layer">
+    <div class="stat-box"><span class="stat-label">MOVES</span><span id="moves" class="stat-val">25</span></div>
+    <div id="my-char-display" style="font-size: 40px;"></div>
+    <div class="stat-box"><span class="stat-label">SCORE</span><span id="score" class="stat-val">0</span></div>
+</div>
+
+<div id="grid-container">
+    <div id="combo-text">Combo!</div>
+    <div id="grid"></div>
+</div>
 
 <script>
-/* ========== camera ========== */
-const video = document.getElementById("video");
-navigator.mediaDevices.getUserMedia({ video: true })
-  .then(s => video.srcObject = s);
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playSfx(type, combo = 0) {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        const t = audioCtx.currentTime;
+        if (type === 'select') {
+            osc.frequency.setValueAtTime(1000, t);
+            gain.gain.setValueAtTime(0.05, t);
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+            osc.start(); osc.stop(t + 0.05);
+        } else if (type === 'match') {
+            osc.frequency.setValueAtTime(400 + (combo * 100), t);
+            gain.gain.setValueAtTime(0.1, t);
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
+            osc.start(); osc.stop(t + 0.3);
+        }
+    }
 
-/* ========== canvas ========== */
-const canvas = document.getElementById("canvas");
-const ctx = canvas.getContext("2d");
-canvas.width = 640;
-canvas.height = 480;
+    const GRID_SIZE = 7;
+    const EMOJIS = ['🐶', '🐱', '🐰', '🐼', '🦊', '🐸'];
+    let grid = [];
+    let score = 0;
+    let moves = 25;
+    let selected = null;
+    let combo = 0;
+    let myChar = '';
 
-/* ========== status ========== */
-const status = document.getElementById("status");
-let handSeen = false;
-let faceSeen = false;
+    function selectChar(char) {
+        myChar = char;
+        document.getElementById('my-char-display').textContent = char;
+        document.getElementById('char-select').style.display = 'none';
+        initGrid();
+    }
 
-/* ========== Three.js ========== */
-const scene = new THREE.Scene();
-const cam3 = new THREE.PerspectiveCamera(70, 640/480, 0.1, 100);
-const renderer = new THREE.WebGLRenderer({antialias:true});
-renderer.setSize(640,480);
-document.getElementById("three").appendChild(renderer.domElement);
+    function initGrid() {
+        for (let r = 0; r < GRID_SIZE; r++) {
+            grid[r] = [];
+            for (let c = 0; c < GRID_SIZE; c++) {
+                let e;
+                do { e = EMOJIS[Math.floor(Math.random() * EMOJIS.length)]; } 
+                while ((r >= 2 && grid[r-1][c].type === e && grid[r-2][c].type === e) || 
+                       (c >= 2 && grid[r][c-1].type === e && grid[r][c-2].type === e));
+                grid[r][c] = { type: e, isBomb: false };
+            }
+        }
+        render();
+    }
 
-const cube = new THREE.Mesh(
-  new THREE.BoxGeometry(),
-  new THREE.MeshNormalMaterial()
-);
-scene.add(cube);
-cam3.position.z = 3;
+    function render() {
+        const g = document.getElementById('grid');
+        g.innerHTML = '';
+        for (let r = 0; r < GRID_SIZE; r++) {
+            for (let c = 0; c < GRID_SIZE; c++) {
+                const div = document.createElement('div');
+                div.className = 'cell';
+                div.textContent = grid[r][c].isBomb ? '💣' : grid[r][c].type;
+                if (selected && selected.r === r && selected.c === c) div.classList.add('selected');
+                div.onclick = () => handleTap(r, c);
+                g.appendChild(div);
+            }
+        }
+    }
 
-(function render3(){
-  requestAnimationFrame(render3);
-  renderer.render(scene, cam3);
-})();
+    async function handleTap(r, c) {
+        if (moves <= 0) return;
+        if (grid[r][c].isBomb) { explode(r, c); return; }
 
-/* ========== Hands ========== */
-const hands = new Hands({
-  locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
-});
-hands.setOptions({ maxNumHands:1, modelComplexity:0 });
+        if (!selected) {
+            selected = { r, c };
+            playSfx('select');
+            render();
+        } else {
+            const dist = Math.abs(selected.r - r) + Math.abs(selected.c - c);
+            if (dist === 1) {
+                moves--;
+                document.getElementById('moves').textContent = moves;
+                await swap(selected.r, selected.c, r, c);
+                combo = 0;
+                if (!await check()) {
+                    await new Promise(res => setTimeout(res, 200));
+                    await swap(selected.r, selected.c, r, c);
+                }
+            }
+            selected = null;
+            render();
+        }
+    }
 
-hands.onResults(r => {
-  if (!r.multiHandLandmarks) {
-    handSeen = false;
-    return;
-  }
-  handSeen = true;
+    async function swap(r1, c1, r2, c2) {
+        const t = grid[r1][c1]; grid[r1][c1] = grid[r2][c2]; grid[r2][c2] = t;
+        render();
+    }
 
-  const lm = r.multiHandLandmarks[0];
-  drawConnectors(ctx, lm, HAND_CONNECTIONS, {color:"#0ff"});
-  drawLandmarks(ctx, lm, {color:"#f0f"});
+    async function check() {
+        let toRem = Array.from({length:7}, () => Array(7).fill(false));
+        let found = false;
+        for (let r=0; r<7; r++) {
+            for (let c=0; c<7; c++) {
+                if (c<5 && grid[r][c].type === grid[r][c+1].type && grid[r][c].type === grid[r][c+2].type) {
+                    toRem[r][c] = toRem[r][c+1] = toRem[r][c+2] = true; found = true;
+                }
+                if (r<5 && grid[r][c].type === grid[r+1][c].type && grid[r][c].type === grid[r+2][c].type) {
+                    toRem[r][c] = toRem[r+1][c] = toRem[r+2][c] = true; found = true;
+                }
+            }
+        }
+        if (found) {
+            combo++;
+            playSfx('match', combo);
+            if (combo > 1) {
+                const ct = document.getElementById('combo-text');
+                ct.textContent = combo + " Combo!";
+                ct.classList.remove('combo-anim');
+                void ct.offsetWidth;
+                ct.classList.add('combo-anim');
+                document.getElementById('grid').classList.add('shake');
+                setTimeout(()=>document.getElementById('grid').classList.remove('shake'), 300);
+            }
+            await processRem(toRem);
+        }
+        return found;
+    }
 
-  const tips = [8,12,16,20];
-  let open = 0;
-  for (const i of tips) if (lm[i].y < lm[i-2].y) open++;
+    async function processRem(toRem) {
+        let bombCreated = false;
+        for (let r=0; r<7; r++) {
+            for (let c=0; c<7; c++) {
+                if (toRem[r][c]) {
+                    score += (grid[r][c].type === myChar) ? 20 : 10;
+                    grid[r][c] = (!bombCreated && Math.random() < 0.1) ? {type:null, isBomb:true} : {type:null, isBomb:false};
+                    if (grid[r][c].isBomb) bombCreated = true;
+                }
+            }
+        }
+        document.getElementById('score').textContent = score;
+        render();
+        await new Promise(res => setTimeout(res, 300));
+        // 落下
+        for (let c=0; c<7; c++) {
+            let empty = 6;
+            for (let r=6; r>=0; r--) {
+                if (grid[r][c].type || grid[r][c].isBomb) {
+                    grid[empty][c] = grid[r][c];
+                    if (empty !== r) grid[r][c] = {type:null, isBomb:false};
+                    empty--;
+                }
+            }
+            for (let r=empty; r>=0; r--) grid[r][c] = {type:EMOJIS[Math.floor(Math.random()*6)], isBomb:false};
+        }
+        render();
+        setTimeout(check, 300);
+    }
 
-  cube.rotation.y += open >= 3 ? 0.05 : 0;
-});
-
-/* ========== Face ========== */
-const face = new FaceMesh({
-  locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`
-});
-face.setOptions({ refineLandmarks:false });
-
-face.onResults(r => {
-  if (!r.multiFaceLandmarks) {
-    faceSeen = false;
-    return;
-  }
-  faceSeen = true;
-
-  const lm = r.multiFaceLandmarks[0];
-  drawConnectors(ctx, lm, FACEMESH_LIPS, {color:"#f00"});
-
-  const d = Math.abs(lm[13].y - lm[14].y);
-  cube.scale.setScalar(d > 0.03 ? 1.5 : 1.0);
-});
-
-/* ========== main loop ========== */
-let busy = false;
-let mode = 0;
-
-async function loop() {
-  requestAnimationFrame(loop);
-
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.drawImage(video,0,0,canvas.width,canvas.height);
-
-  status.textContent =
-    `hand:${handSeen} face:${faceSeen}`;
-
-  if (busy) return;
-  busy = true;
-
-  if (mode === 0) {
-    await hands.send({ image: video });
-  } else {
-    await face.send({ image: video });
-  }
-  mode ^= 1;
-  busy = false;
-}
-
-video.onloadeddata = () => loop();
+    function explode(r, c) {
+        let toRem = Array.from({length:7}, () => Array(7).fill(false));
+        for (let i=r-1; i<=r+1; i++) for (let j=c-1; j<=c+1; j++) if (i>=0 && i<7 && j>=0 && j<7) toRem[i][j] = true;
+        processRem(toRem);
+    }
 </script>
-
 </body>
 </html>
