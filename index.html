@@ -1,164 +1,727 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <title>8-BIT PRO SYSTEM v14.0</title>
-    <script src="https://unpkg.com/tone"></script>
-    <script src="https://unpkg.com/@tonejs/midi"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=DotGothic16&display=swap');
-        :root { --fc-red: #8c1e23; --fc-cream: #f5eedc; --fc-gold: #ffcf00; --fc-black: #111; }
-        body { background: #111; color: var(--fc-black); font-family: 'DotGothic16', sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .console { background: var(--fc-cream); width: 650px; border-radius: 15px; border-bottom: 10px solid #aaa; padding: 20px; box-shadow: 0 20px 60px #000; }
-        .top-stripe { background: var(--fc-red); height: 40px; margin: -20px -20px 20px; border-radius: 15px 15px 0 0; display: flex; align-items: center; padding: 0 20px; color: var(--fc-gold); font-weight: bold; font-size: 0.9rem; }
-        
-        .main-display { background: #1a1a1a; border: 8px solid var(--fc-red); height: 200px; padding: 15px; display: flex; flex-direction: column; position: relative; }
-        #drop-zone { border: 2px dashed var(--fc-gold); color: var(--fc-gold); padding: 20px; text-align: center; cursor: pointer; font-size: 0.8rem; flex-grow: 1; display: flex; align-items: center; justify-content: center; }
-        
-        .viz-grid { display: flex; justify-content: space-around; height: 60px; align-items: flex-end; margin-top: 10px; border-top: 1px solid #333; }
-        .v-bar { width: 12%; background: var(--fc-gold); border: 1px solid #fff; height: 0%; transition: height 0.05s; }
-        
-        .pro-panel { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 20px; background: #ddd; padding: 15px; border: 3px inset #fff; }
-        .knob-box { text-align: center; font-size: 0.6rem; }
-        input[type=range] { width: 100%; accent-color: var(--fc-red); }
-
-        .controls { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; }
-        .joypad { display: grid; grid-template-areas: ". up ." "left . right" ". down ."; gap: 2px; }
-        .pad-btn { width: 20px; height: 20px; background: #333; border-radius: 3px; }
-        
-        .action-btns { display: flex; gap: 15px; }
-        .round-btn { width: 50px; height: 50px; border-radius: 50%; border: 4px solid #fff; background: var(--fc-red); color: #fff; font-weight: bold; cursor: pointer; box-shadow: 0 4px 0 #601215; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; }
-        .round-btn:active { transform: translateY(3px); box-shadow: none; }
-        .round-btn:disabled { background: #888; box-shadow: 0 4px 0 #444; cursor: not-allowed; }
-
-        #status-msg { font-size: 0.7rem; color: #ff007f; text-align: center; margin-top: 10px; height: 1em; }
-    </style>
-</head>
-<body>
-
-<div class="console">
-    <div class="top-stripe">PRO MIDI MASTERING SYSTEM v14.0</div>
-    
-    <div class="main-display">
-        <div id="drop-zone">MIDI CASSETTE SLOT<br>(Click to Insert)</div>
-        <div class="viz-grid" id="viz-container">
-            <div class="v-bar"></div><div class="v-bar"></div><div class="v-bar"></div><div class="v-bar"></div><div class="v-bar"></div>
-        </div>
-    </div>
-
-    <div class="pro-panel">
-        <div class="knob-box">
-            BIT CRUSH
-            <input type="range" id="crush-ctrl" min="1" max="8" value="4">
-        </div>
-        <div class="knob-box">
-            WARMTH
-            <input type="range" id="warm-ctrl" min="0" max="100" value="20">
-        </div>
-        <div class="knob-box">
-            SPEED
-            <input type="range" id="speed-ctrl" min="50" max="150" value="100">
-        </div>
-    </div>
-
-    <div class="controls">
-        <div class="joypad">
-            <div class="pad-btn" style="grid-area:up"></div>
-            <div class="pad-btn" style="grid-area:left"></div>
-            <div class="pad-btn" style="grid-area:right"></div>
-            <div class="pad-btn" style="grid-area:down"></div>
-        </div>
-        <div id="status-msg">AWAITING CASSETTE...</div>
-        <div class="action-btns">
-            <button class="round-btn" id="play-btn" disabled>START</button>
-            <button class="round-btn" id="stop-btn" disabled style="background:#444">RESET</button>
-        </div>
-    </div>
-</div>
-
-<script>
-    const bars = document.querySelectorAll('.v-bar');
-    const playBtn = document.getElementById('play-btn');
-    const stopBtn = document.getElementById('stop-btn');
-    const dropZone = document.getElementById('drop-zone');
-    const status = document.getElementById('status-msg');
-    
-    const crushCtrl = document.getElementById('crush-ctrl');
-    const warmCtrl = document.getElementById('warm-ctrl');
-    const speedCtrl = document.getElementById('speed-ctrl');
-
-    let midiData = null;
-
-    // --- 高機能オーディオチェーン ---
-    const bitCrusher = new Tone.BitCrusher(4).toDestination();
-    const dist = new Tone.Distortion(0.2).connect(bitCrusher);
-    const filter = new Tone.Filter(3000, "lowpass").connect(dist);
-    const masterVol = new Tone.Volume(-10).connect(filter);
-
-    // 5チャンネル音源 (Pulse1, Pulse2, Tri, Noise, DPCM/Sub)
-    const synths = [
-        new Tone.PolySynth(Tone.Synth, { oscillator: { type: "pulse", width: 0.5 }, envelope: { attack: 0.001, decay: 0.1, sustain: 0.3, release: 0.02 } }).connect(masterVol),
-        new Tone.PolySynth(Tone.Synth, { oscillator: { type: "pulse", width: 0.25 }, envelope: { attack: 0.001, decay: 0.1, sustain: 0.3, release: 0.02 } }).connect(masterVol),
-        new Tone.PolySynth(Tone.Synth, { oscillator: { type: "triangle" }, envelope: { attack: 0.01, sustain: 1, release: 0.02 } }).connect(masterVol),
-        new Tone.NoiseSynth({ envelope: { attack: 0.001, decay: 0.1, sustain: 0 } }).connect(masterVol),
-        new Tone.PolySynth(Tone.Synth, { oscillator: { type: "square" }, envelope: { attack: 0.01, decay: 0.2, sustain: 0, release: 0.1 } }).connect(masterVol) // DPCM代用
-    ];
-
-    dropZone.onclick = () => {
-        const input = document.createElement('input');
-        input.type = 'file'; input.accept = '.mid';
-        input.onchange = e => load(e.target.files[0]);
-        input.click();
-    };
-
-    async function load(file) {
-        const ab = await file.arrayBuffer();
-        midiData = new Midi(ab);
-        status.innerText = "CASSETTE LOADED.";
-        dropZone.innerHTML = `<span style="color:#fff">TRACK: ${file.name.substring(0,12)}</span>`;
-        playBtn.disabled = false; stopBtn.disabled = false;
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>顔年齢サイト</title>
+  <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1220;
+      --panel: #171b2e;
+      --panel-2: #1d2340;
+      --text: #eef2ff;
+      --muted: #b9c0e0;
+      --accent: #7aa2ff;
+      --ok: #8ee6a3;
+      --warn: #ffd36a;
+      --danger: #ff8f8f;
+      --shadow: 0 18px 50px rgba(0, 0, 0, 0.32);
+      --radius: 22px;
     }
 
-    // リアルタイムコントロールの反映
-    crushCtrl.oninput = (e) => bitCrusher.bits = e.target.value;
-    warmCtrl.oninput = (e) => dist.distortion = e.target.value / 100;
-    speedCtrl.oninput = (e) => Tone.Transport.bpm.value = 120 * (e.target.value / 100);
+    * { box-sizing: border-box; }
 
-    playBtn.onclick = async () => {
-        await Tone.start();
-        Tone.Transport.stop(); Tone.Transport.cancel();
-        Tone.Transport.bpm.value = 120 * (speedCtrl.value / 100);
+    body {
+      margin: 0;
+      font-family: "Inter", "Hiragino Sans", "Yu Gothic UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(122, 162, 255, 0.18), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(142, 230, 163, 0.12), transparent 22%),
+        linear-gradient(180deg, #0b0e19, #11162a 45%, #0b0e19);
+      color: var(--text);
+      min-height: 100vh;
+    }
 
-        midiData.tracks.forEach((track, i) => {
-            let role = i % 5;
-            if (track.channel === 9) role = 3;
+    .wrap {
+      width: min(1100px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 32px 0 48px;
+    }
 
-            track.notes.forEach(note => {
-                Tone.Transport.schedule((time) => {
-                    const v = Math.floor(note.velocity * 15) / 15;
-                    if (role === 3) {
-                        synths[3].triggerAttackRelease("16n", time, v);
-                    } else {
-                        synths[role].triggerAttackRelease(note.name, note.duration, time, v);
-                    }
+    .hero {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 22px;
+      align-items: stretch;
+      margin-bottom: 22px;
+    }
 
-                    Tone.Draw.schedule(() => {
-                        bars[role].style.height = (v * 100) + "%";
-                        setTimeout(() => bars[role].style.height = "0%", note.duration * 1000);
-                    }, time);
-                }, note.time);
-            });
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: var(--shadow);
+      border-radius: var(--radius);
+      padding: 22px;
+      backdrop-filter: blur(10px);
+    }
+
+    h1 {
+      font-size: clamp(28px, 4vw, 44px);
+      line-height: 1.05;
+      margin: 0 0 14px;
+      letter-spacing: -0.03em;
+    }
+
+    .lead {
+      margin: 0;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.8;
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .pill {
+      padding: 9px 12px;
+      border-radius: 999px;
+      background: rgba(122, 162, 255, 0.12);
+      border: 1px solid rgba(122, 162, 255, 0.25);
+      color: #dce6ff;
+      font-size: 13px;
+    }
+
+    .status-box {
+      display: grid;
+      gap: 12px;
+      align-content: start;
+    }
+
+    .status {
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: var(--panel-2);
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.6;
+      border: 1px solid rgba(255,255,255,0.06);
+      min-height: 78px;
+      white-space: pre-line;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 22px;
+      align-items: start;
+    }
+
+    .dropzone {
+      position: relative;
+      border: 2px dashed rgba(255,255,255,0.16);
+      background: rgba(255,255,255,0.03);
+      border-radius: 24px;
+      padding: 22px;
+      transition: 0.2s ease;
+    }
+
+    .dropzone.dragover {
+      border-color: var(--accent);
+      background: rgba(122, 162, 255, 0.08);
+      transform: scale(1.01);
+    }
+
+    .dropzone-top {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    button, .file-label {
+      appearance: none;
+      border: 0;
+      cursor: pointer;
+      border-radius: 14px;
+      padding: 12px 16px;
+      font-size: 14px;
+      font-weight: 700;
+      color: white;
+      background: linear-gradient(180deg, #7aa2ff, #5d82dc);
+      box-shadow: 0 10px 24px rgba(93, 130, 220, 0.28);
+      transition: transform 0.14s ease, opacity 0.14s ease;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    button:hover, .file-label:hover { transform: translateY(-1px); }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+      transform: none;
+    }
+
+    .ghost {
+      background: rgba(255,255,255,0.06);
+      box-shadow: none;
+      border: 1px solid rgba(255,255,255,0.08);
+      color: var(--text);
+    }
+
+    input[type="file"] { display: none; }
+
+    .canvas-wrap {
+      position: relative;
+      background: #0a0d17;
+      border-radius: 18px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.08);
+      min-height: 360px;
+      display: grid;
+      place-items: center;
+    }
+
+    canvas {
+      display: block;
+      max-width: 100%;
+      height: auto;
+    }
+
+    .placeholder {
+      padding: 36px 20px;
+      text-align: center;
+      color: var(--muted);
+      line-height: 1.8;
+    }
+
+    .side {
+      display: grid;
+      gap: 18px;
+      position: sticky;
+      top: 18px;
+    }
+
+    .result-main {
+      display: grid;
+      gap: 12px;
+    }
+
+    .big-age {
+      font-size: clamp(44px, 8vw, 78px);
+      font-weight: 900;
+      letter-spacing: -0.05em;
+      line-height: 0.95;
+      margin: 0;
+    }
+
+    .sub {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.7;
+      margin: 0;
+    }
+
+    .meter {
+      height: 14px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .meter > div {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #8ee6a3, #7aa2ff, #ffd36a);
+      transition: width 0.35s ease;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .stat {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 16px;
+      padding: 14px;
+    }
+
+    .stat .k {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .stat .v {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+    }
+
+    .tips {
+      margin: 0;
+      padding-left: 20px;
+      color: var(--muted);
+      line-height: 1.8;
+      font-size: 14px;
+    }
+
+    .face-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .face-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 14px;
+      padding: 12px 14px;
+      font-size: 14px;
+    }
+
+    .face-item strong { font-size: 16px; }
+
+    .footer-note {
+      margin-top: 18px;
+      color: #9aa5d1;
+      font-size: 12px;
+      line-height: 1.8;
+    }
+
+    @media (max-width: 920px) {
+      .hero, .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .side {
+        position: static;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <div class="card">
+        <h1>顔年齢チェッカー</h1>
+        <p class="lead">
+          写真をアップしたら、顔を見つけて推定年齢を出すサイトやで。<br>
+          顔が複数ある画像にも対応。検出枠と年齢をキャンバス上に重ねて表示する。
+        </p>
+        <div class="pill-row">
+          <span class="pill">ブラウザだけで動く</span>
+          <span class="pill">画像ドラッグ&ドロップ対応</span>
+          <span class="pill">複数人の顔を同時判定</span>
+        </div>
+      </div>
+
+      <div class="card status-box">
+        <div id="modelStatus" class="status">モデル読み込み待機中…</div>
+        <div class="status">
+          なるべく正面で、顔がはっきり写ってる写真のほうが当たりやすいで。<br>
+          暗い写真、横顔、加工強め、顔が小さすぎる画像はブレやすい。
+        </div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <div id="dropzone" class="dropzone">
+          <div class="dropzone-top">
+            <div>
+              <div style="font-size: 20px; font-weight: 800; margin-bottom: 6px;">画像を入れて判定</div>
+              <div style="color: var(--muted); font-size: 14px;">PNG / JPG / WEBP に対応</div>
+            </div>
+            <div class="controls">
+              <label class="file-label" for="fileInput">画像を選ぶ</label>
+              <button id="analyzeBtn" disabled>年齢を判定</button>
+              <button id="clearBtn" class="ghost">リセット</button>
+            </div>
+          </div>
+
+          <input id="fileInput" type="file" accept="image/*" />
+
+          <div class="canvas-wrap">
+            <div id="placeholder" class="placeholder">
+              ここに画像をドラッグ&ドロップするか、<br>
+              「画像を選ぶ」から写真を入れてな。
+            </div>
+            <canvas id="canvas" hidden></canvas>
+          </div>
+        </div>
+
+        <div class="footer-note">
+          このサイトの年齢はあくまで推定値やで。本人確認や診断には使わんようにしてな。
+        </div>
+      </div>
+
+      <aside class="side">
+        <div class="card result-main">
+          <div style="font-size: 14px; color: var(--muted);">代表の推定年齢</div>
+          <p id="mainAge" class="big-age">--</p>
+          <p id="mainText" class="sub">画像を入れると、ここに結果が出るで。</p>
+          <div class="meter"><div id="confidenceBar"></div></div>
+          <div style="font-size: 12px; color: var(--muted);">検出信頼度</div>
+        </div>
+
+        <div class="card">
+          <div style="font-size: 18px; font-weight: 800; margin-bottom: 12px;">結果サマリー</div>
+          <div class="stats">
+            <div class="stat">
+              <div class="k">見つかった顔</div>
+              <div id="faceCount" class="v">0</div>
+            </div>
+            <div class="stat">
+              <div class="k">平均推定年齢</div>
+              <div id="avgAge" class="v">--</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div style="font-size: 18px; font-weight: 800; margin-bottom: 12px;">各顔の結果</div>
+          <div id="faceList" class="face-list">
+            <div class="sub">まだ結果なし</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div style="font-size: 18px; font-weight: 800; margin-bottom: 12px;">使い方のコツ</div>
+          <ul class="tips">
+            <li>顔が大きめに写ってる写真が有利</li>
+            <li>ブレが少ない画像を使う</li>
+            <li>逆光より、明るい正面写真が安定</li>
+          </ul>
+        </div>
+      </aside>
+    </section>
+  </div>
+
+  <script>
+    const MODEL_URLS = [
+      './models',
+      'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js/weights',
+      'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights',
+      'https://justadudewhohacks.github.io/face-api.js/models'
+    ];
+
+    const modelStatus = document.getElementById('modelStatus');
+    const fileInput = document.getElementById('fileInput');
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const dropzone = document.getElementById('dropzone');
+    const canvas = document.getElementById('canvas');
+    const placeholder = document.getElementById('placeholder');
+    const ctx = canvas.getContext('2d');
+
+    const mainAge = document.getElementById('mainAge');
+    const mainText = document.getElementById('mainText');
+    const confidenceBar = document.getElementById('confidenceBar');
+    const faceCount = document.getElementById('faceCount');
+    const avgAge = document.getElementById('avgAge');
+    const faceList = document.getElementById('faceList');
+
+    let imageEl = null;
+    let modelsReady = false;
+
+    function setStatus(message, type = 'normal') {
+      modelStatus.textContent = message;
+      if (type === 'ok') {
+        modelStatus.style.color = 'var(--ok)';
+      } else if (type === 'warn') {
+        modelStatus.style.color = 'var(--warn)';
+      } else if (type === 'danger') {
+        modelStatus.style.color = 'var(--danger)';
+      } else {
+        modelStatus.style.color = 'var(--muted)';
+      }
+    }
+
+    function resetResults() {
+      mainAge.textContent = '--';
+      mainText.textContent = '画像を入れると、ここに結果が出るで。';
+      confidenceBar.style.width = '0%';
+      faceCount.textContent = '0';
+      avgAge.textContent = '--';
+      faceList.innerHTML = '<div class="sub">まだ結果なし</div>';
+    }
+
+    function clearCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      canvas.hidden = true;
+      placeholder.hidden = false;
+      imageEl = null;
+      fileInput.value = '';
+      analyzeBtn.disabled = true;
+      resetResults();
+      if (modelsReady) {
+        setStatus('リセットしたで。新しい画像を入れてな。', 'ok');
+      }
+    }
+
+    function fitCanvasToImage(img) {
+      const maxWidth = Math.max(320, dropzone.clientWidth - 48);
+      const naturalWidth = img.naturalWidth || img.width;
+      const naturalHeight = img.naturalHeight || img.height;
+      const ratio = Math.min(1, maxWidth / naturalWidth);
+      canvas.width = Math.round(naturalWidth * ratio);
+      canvas.height = Math.round(naturalHeight * ratio);
+      canvas.hidden = false;
+      placeholder.hidden = true;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    }
+
+    function readImageFile(file) {
+      if (!file || !file.type.startsWith('image/')) {
+        setStatus('画像ファイルを入れてな。', 'warn');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onerror = () => {
+        setStatus('画像の読み込みに失敗したで。別の画像で試してな。', 'danger');
+      };
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          imageEl = img;
+          fitCanvasToImage(img);
+          analyzeBtn.disabled = !modelsReady;
+          resetResults();
+          setStatus('画像を読み込んだで。「年齢を判定」を押してな。', 'ok');
+        };
+        img.onerror = () => {
+          setStatus('画像の表示に失敗したで。対応形式を確認してな。', 'danger');
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    async function waitForFaceApi(maxWaitMs = 8000) {
+      const start = Date.now();
+      while (Date.now() - start < maxWaitMs) {
+        if (window.faceapi && window.faceapi.nets) {
+          return window.faceapi;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      throw new Error('face-api.js の読み込み待機がタイムアウトしたで');
+    }
+
+    async function loadModels() {
+      try {
+        setStatus('AIモデルを読み込み中… 初回は少しだけ時間かかるで');
+
+        const faceapi = await waitForFaceApi();
+        const failedUrls = [];
+
+        for (const url of MODEL_URLS) {
+          try {
+            await Promise.all([
+              faceapi.nets.tinyFaceDetector.loadFromUri(url),
+              faceapi.nets.ageGenderNet.loadFromUri(url)
+            ]);
+
+            modelsReady = true;
+            analyzeBtn.disabled = !imageEl;
+            setStatus('モデル準備完了。画像を入れたらすぐ判定できるで。', 'ok');
+            console.log('モデル読み込み成功:', url);
+            return;
+          } catch (err) {
+            failedUrls.push(url);
+            console.warn('モデル読み込み失敗:', url, err);
+          }
+        }
+
+        throw new Error('利用可能なモデルURLが全部失敗したで: ' + failedUrls.join(', '));
+      } catch (error) {
+        console.error(error);
+        modelsReady = false;
+        analyzeBtn.disabled = true;
+        setStatus(
+          'モデル読み込みに失敗したで。\n' +
+          'まずは ./models にモデルを置く方法がいちばん安定や。\n' +
+          'それでもあかんかったらコンソールの詳細エラーを見てな。',
+          'danger'
+        );
+      }
+    }
+
+    async function analyzeFaceAge() {
+      if (!modelsReady || !imageEl || !window.faceapi) {
+        setStatus('まだ解析できへんで。モデル読み込みと画像の準備を確認してな。', 'warn');
+        return;
+      }
+
+      analyzeBtn.disabled = true;
+      setStatus('顔を解析中…', 'warn');
+      resetResults();
+      fitCanvasToImage(imageEl);
+
+      try {
+        const detections = await window.faceapi
+          .detectAllFaces(imageEl, new window.faceapi.TinyFaceDetectorOptions({
+            inputSize: 416,
+            scoreThreshold: 0.35
+          }))
+          .withAgeAndGender();
+
+        if (!detections.length) {
+          setStatus('顔が見つからへんかった。別の写真で試してみてな。', 'danger');
+          mainText.textContent = '顔が検出できへんかったで。正面で明るい写真がええ感じ。';
+          return;
+        }
+
+        const displaySize = { width: canvas.width, height: canvas.height };
+        const resized = window.faceapi.resizeResults(detections, displaySize);
+
+        let totalAge = 0;
+        let maxScore = 0;
+        let representative = null;
+
+        ctx.drawImage(imageEl, 0, 0, canvas.width, canvas.height);
+        faceList.innerHTML = '';
+
+        resized.forEach((det, index) => {
+          const { x, y, width, height } = det.detection.box;
+          const age = Math.round(det.age);
+          const score = det.detection.score || 0;
+          const gender = det.gender === 'male' ? '男性寄り' : '女性寄り';
+
+          totalAge += age;
+          if (score > maxScore) {
+            maxScore = score;
+            representative = { age, score, gender };
+          }
+
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = 'rgba(122, 162, 255, 0.95)';
+          ctx.strokeRect(x, y, width, height);
+
+          const label = `#${index + 1}  ${age}歳 / ${gender}`;
+          ctx.font = 'bold 18px sans-serif';
+          const textWidth = ctx.measureText(label).width;
+          const labelHeight = 30;
+          const labelX = x;
+          const labelY = Math.max(0, y - labelHeight - 4);
+
+          ctx.fillStyle = 'rgba(15, 18, 32, 0.85)';
+          ctx.fillRect(labelX, labelY, textWidth + 16, labelHeight);
+          ctx.fillStyle = '#eef2ff';
+          ctx.fillText(label, labelX + 8, labelY + 21);
+
+          const item = document.createElement('div');
+          item.className = 'face-item';
+          item.innerHTML = `
+            <div>
+              <div style="color: var(--muted); font-size: 12px; margin-bottom: 4px;">顔 ${index + 1}</div>
+              <strong>${age}歳</strong>
+            </div>
+            <div style="text-align: right; color: var(--muted);">
+              <div>${gender}</div>
+              <div>信頼度 ${(score * 100).toFixed(1)}%</div>
+            </div>
+          `;
+          faceList.appendChild(item);
         });
 
-        Tone.Transport.start();
-        status.innerText = "SYSTEM RUNNING...";
-    };
+        const average = Math.round(totalAge / resized.length);
+        faceCount.textContent = String(resized.length);
+        avgAge.textContent = `${average}歳`;
 
-    stopBtn.onclick = () => {
-        Tone.Transport.stop();
-        synths.forEach(s => s.releaseAll ? s.releaseAll() : null);
-        status.innerText = "SYSTEM RESET.";
-    };
-</script>
+        if (representative) {
+          mainAge.textContent = `${representative.age}歳`;
+          mainText.textContent = `いちばん信頼度が高かった顔の推定年齢やで。${representative.gender}として判定。`;
+          confidenceBar.style.width = `${Math.max(6, Math.min(100, representative.score * 100))}%`;
+        }
+
+        setStatus(`解析完了。${resized.length}人ぶんの顔を検出したで。`, 'ok');
+      } catch (error) {
+        console.error(error);
+        setStatus('解析に失敗したで。画像サイズを変えるか、別画像で試してな。', 'danger');
+      } finally {
+        analyzeBtn.disabled = !imageEl || !modelsReady;
+      }
+    }
+
+    function runSelfChecks() {
+      const checks = [
+        ['modelStatus element', !!modelStatus],
+        ['fileInput element', !!fileInput],
+        ['analyzeBtn element', !!analyzeBtn],
+        ['canvas context', !!ctx]
+      ];
+
+      const failed = checks.filter(([, ok]) => !ok);
+      if (failed.length > 0) {
+        console.error('Self-check failed:', failed);
+        setStatus('初期化に失敗したで。HTMLの要素構成が壊れてる可能性ある。', 'danger');
+        return false;
+      }
+
+      console.log('Self-check passed:', checks);
+      return true;
+    }
+
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (file) {
+        readImageFile(file);
+      }
+    });
+
+    analyzeBtn.addEventListener('click', analyzeFaceAge);
+    clearBtn.addEventListener('click', clearCanvas);
+
+    ['dragenter', 'dragover'].forEach((eventName) => {
+      dropzone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.add('dragover');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach((eventName) => {
+      dropzone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.remove('dragover');
+      });
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+      const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (file) {
+        readImageFile(file);
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      if (imageEl) {
+        fitCanvasToImage(imageEl);
+      }
+    });
+
+    resetResults();
+    if (runSelfChecks()) {
+      loadModels();
+    }
+  </script>
 </body>
 </html>
