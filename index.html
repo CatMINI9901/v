@@ -1,727 +1,127 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>顔年齢サイト</title>
-  <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
-  <style>
-    :root {
-      --bg: #0f1220;
-      --panel: #171b2e;
-      --panel-2: #1d2340;
-      --text: #eef2ff;
-      --muted: #b9c0e0;
-      --accent: #7aa2ff;
-      --ok: #8ee6a3;
-      --warn: #ffd36a;
-      --danger: #ff8f8f;
-      --shadow: 0 18px 50px rgba(0, 0, 0, 0.32);
-      --radius: 22px;
-    }
-
-    * { box-sizing: border-box; }
-
-    body {
-      margin: 0;
-      font-family: "Inter", "Hiragino Sans", "Yu Gothic UI", sans-serif;
-      background:
-        radial-gradient(circle at top left, rgba(122, 162, 255, 0.18), transparent 28%),
-        radial-gradient(circle at bottom right, rgba(142, 230, 163, 0.12), transparent 22%),
-        linear-gradient(180deg, #0b0e19, #11162a 45%, #0b0e19);
-      color: var(--text);
-      min-height: 100vh;
-    }
-
-    .wrap {
-      width: min(1100px, calc(100% - 32px));
-      margin: 0 auto;
-      padding: 32px 0 48px;
-    }
-
-    .hero {
-      display: grid;
-      grid-template-columns: 1.1fr 0.9fr;
-      gap: 22px;
-      align-items: stretch;
-      margin-bottom: 22px;
-    }
-
-    .card {
-      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
-      border: 1px solid rgba(255,255,255,0.08);
-      box-shadow: var(--shadow);
-      border-radius: var(--radius);
-      padding: 22px;
-      backdrop-filter: blur(10px);
-    }
-
-    h1 {
-      font-size: clamp(28px, 4vw, 44px);
-      line-height: 1.05;
-      margin: 0 0 14px;
-      letter-spacing: -0.03em;
-    }
-
-    .lead {
-      margin: 0;
-      color: var(--muted);
-      font-size: 15px;
-      line-height: 1.8;
-    }
-
-    .pill-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-top: 18px;
-    }
-
-    .pill {
-      padding: 9px 12px;
-      border-radius: 999px;
-      background: rgba(122, 162, 255, 0.12);
-      border: 1px solid rgba(122, 162, 255, 0.25);
-      color: #dce6ff;
-      font-size: 13px;
-    }
-
-    .status-box {
-      display: grid;
-      gap: 12px;
-      align-content: start;
-    }
-
-    .status {
-      padding: 14px 16px;
-      border-radius: 16px;
-      background: var(--panel-2);
-      color: var(--muted);
-      font-size: 14px;
-      line-height: 1.6;
-      border: 1px solid rgba(255,255,255,0.06);
-      min-height: 78px;
-      white-space: pre-line;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: 1fr 340px;
-      gap: 22px;
-      align-items: start;
-    }
-
-    .dropzone {
-      position: relative;
-      border: 2px dashed rgba(255,255,255,0.16);
-      background: rgba(255,255,255,0.03);
-      border-radius: 24px;
-      padding: 22px;
-      transition: 0.2s ease;
-    }
-
-    .dropzone.dragover {
-      border-color: var(--accent);
-      background: rgba(122, 162, 255, 0.08);
-      transform: scale(1.01);
-    }
-
-    .dropzone-top {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 16px;
-    }
-
-    .controls {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-
-    button, .file-label {
-      appearance: none;
-      border: 0;
-      cursor: pointer;
-      border-radius: 14px;
-      padding: 12px 16px;
-      font-size: 14px;
-      font-weight: 700;
-      color: white;
-      background: linear-gradient(180deg, #7aa2ff, #5d82dc);
-      box-shadow: 0 10px 24px rgba(93, 130, 220, 0.28);
-      transition: transform 0.14s ease, opacity 0.14s ease;
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-    }
-
-    button:hover, .file-label:hover { transform: translateY(-1px); }
-
-    button:disabled {
-      cursor: not-allowed;
-      opacity: 0.55;
-      transform: none;
-    }
-
-    .ghost {
-      background: rgba(255,255,255,0.06);
-      box-shadow: none;
-      border: 1px solid rgba(255,255,255,0.08);
-      color: var(--text);
-    }
-
-    input[type="file"] { display: none; }
-
-    .canvas-wrap {
-      position: relative;
-      background: #0a0d17;
-      border-radius: 18px;
-      overflow: hidden;
-      border: 1px solid rgba(255,255,255,0.08);
-      min-height: 360px;
-      display: grid;
-      place-items: center;
-    }
-
-    canvas {
-      display: block;
-      max-width: 100%;
-      height: auto;
-    }
-
-    .placeholder {
-      padding: 36px 20px;
-      text-align: center;
-      color: var(--muted);
-      line-height: 1.8;
-    }
-
-    .side {
-      display: grid;
-      gap: 18px;
-      position: sticky;
-      top: 18px;
-    }
-
-    .result-main {
-      display: grid;
-      gap: 12px;
-    }
-
-    .big-age {
-      font-size: clamp(44px, 8vw, 78px);
-      font-weight: 900;
-      letter-spacing: -0.05em;
-      line-height: 0.95;
-      margin: 0;
-    }
-
-    .sub {
-      color: var(--muted);
-      font-size: 14px;
-      line-height: 1.7;
-      margin: 0;
-    }
-
-    .meter {
-      height: 14px;
-      border-radius: 999px;
-      background: rgba(255,255,255,0.08);
-      overflow: hidden;
-      border: 1px solid rgba(255,255,255,0.06);
-    }
-
-    .meter > div {
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(90deg, #8ee6a3, #7aa2ff, #ffd36a);
-      transition: width 0.35s ease;
-    }
-
-    .stats {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-    }
-
-    .stat {
-      background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.06);
-      border-radius: 16px;
-      padding: 14px;
-    }
-
-    .stat .k {
-      font-size: 12px;
-      color: var(--muted);
-      margin-bottom: 8px;
-    }
-
-    .stat .v {
-      font-size: 22px;
-      font-weight: 800;
-      letter-spacing: -0.03em;
-    }
-
-    .tips {
-      margin: 0;
-      padding-left: 20px;
-      color: var(--muted);
-      line-height: 1.8;
-      font-size: 14px;
-    }
-
-    .face-list {
-      display: grid;
-      gap: 10px;
-    }
-
-    .face-item {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      align-items: center;
-      background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.06);
-      border-radius: 14px;
-      padding: 12px 14px;
-      font-size: 14px;
-    }
-
-    .face-item strong { font-size: 16px; }
-
-    .footer-note {
-      margin-top: 18px;
-      color: #9aa5d1;
-      font-size: 12px;
-      line-height: 1.8;
-    }
-
-    @media (max-width: 920px) {
-      .hero, .grid {
-        grid-template-columns: 1fr;
-      }
-
-      .side {
-        position: static;
-      }
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediaPipe - Skeleton Only</title>
+    <style>
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            margin: 0;
+            background-color: #050505;
+            color: #00FF00;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .container {
+            position: relative;
+            width: 640px;
+            height: 480px;
+            border: 2px solid #333;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.2);
+        }
+        /* ビデオは処理に必要だが、表示はしない */
+        #webcam {
+            display: none;
+        }
+        /* キャンバスに背景色をつけて骨格だけを見せる */
+        #output_canvas {
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            transform: rotateY(180deg); /* 鏡合わせにする */
+        }
+        .status {
+            position: absolute;
+            top: 10px;
+            font-size: 0.9rem;
+        }
+    </style>
 </head>
 <body>
-  <div class="wrap">
-    <section class="hero">
-      <div class="card">
-        <h1>顔年齢チェッカー</h1>
-        <p class="lead">
-          写真をアップしたら、顔を見つけて推定年齢を出すサイトやで。<br>
-          顔が複数ある画像にも対応。検出枠と年齢をキャンバス上に重ねて表示する。
-        </p>
-        <div class="pill-row">
-          <span class="pill">ブラウザだけで動く</span>
-          <span class="pill">画像ドラッグ&ドロップ対応</span>
-          <span class="pill">複数人の顔を同時判定</span>
-        </div>
-      </div>
 
-      <div class="card status-box">
-        <div id="modelStatus" class="status">モデル読み込み待機中…</div>
-        <div class="status">
-          なるべく正面で、顔がはっきり写ってる写真のほうが当たりやすいで。<br>
-          暗い写真、横顔、加工強め、顔が小さすぎる画像はブレやすい。
-        </div>
-      </div>
-    </section>
+    <div class="status" id="status">System Initializing...</div>
 
-    <section class="grid">
-      <div class="card">
-        <div id="dropzone" class="dropzone">
-          <div class="dropzone-top">
-            <div>
-              <div style="font-size: 20px; font-weight: 800; margin-bottom: 6px;">画像を入れて判定</div>
-              <div style="color: var(--muted); font-size: 14px;">PNG / JPG / WEBP に対応</div>
-            </div>
-            <div class="controls">
-              <label class="file-label" for="fileInput">画像を選ぶ</label>
-              <button id="analyzeBtn" disabled>年齢を判定</button>
-              <button id="clearBtn" class="ghost">リセット</button>
-            </div>
-          </div>
+    <div class="container">
+        <video id="webcam" autoplay playsinline></video>
+        <canvas id="output_canvas"></canvas>
+    </div>
 
-          <input id="fileInput" type="file" accept="image/*" />
+    <script type="module">
+        import {
+            PoseLandmarker,
+            FilesetResolver,
+            DrawingUtils
+        } from "https://cdn.skypack.dev/@mediapipe/tasks-vision@0.10.0";
 
-          <div class="canvas-wrap">
-            <div id="placeholder" class="placeholder">
-              ここに画像をドラッグ&ドロップするか、<br>
-              「画像を選ぶ」から写真を入れてな。
-            </div>
-            <canvas id="canvas" hidden></canvas>
-          </div>
-        </div>
+        const video = document.getElementById("webcam");
+        const canvasElement = document.getElementById("output_canvas");
+        const canvasCtx = canvasElement.getContext("2d");
+        const statusDiv = document.getElementById("status");
 
-        <div class="footer-note">
-          このサイトの年齢はあくまで推定値やで。本人確認や診断には使わんようにしてな。
-        </div>
-      </div>
+        let poseLandmarker = undefined;
+        let lastVideoTime = -1;
 
-      <aside class="side">
-        <div class="card result-main">
-          <div style="font-size: 14px; color: var(--muted);">代表の推定年齢</div>
-          <p id="mainAge" class="big-age">--</p>
-          <p id="mainText" class="sub">画像を入れると、ここに結果が出るで。</p>
-          <div class="meter"><div id="confidenceBar"></div></div>
-          <div style="font-size: 12px; color: var(--muted);">検出信頼度</div>
-        </div>
+        async function init() {
+            const vision = await FilesetResolver.forVisionTasks(
+                "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
+            );
+            
+            poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
+                baseOptions: {
+                    modelAssetPath: `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task`,
+                    delegate: "GPU"
+                },
+                runningMode: "VIDEO"
+            });
 
-        <div class="card">
-          <div style="font-size: 18px; font-weight: 800; margin-bottom: 12px;">結果サマリー</div>
-          <div class="stats">
-            <div class="stat">
-              <div class="k">見つかった顔</div>
-              <div id="faceCount" class="v">0</div>
-            </div>
-            <div class="stat">
-              <div class="k">平均推定年齢</div>
-              <div id="avgAge" class="v">--</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="card">
-          <div style="font-size: 18px; font-weight: 800; margin-bottom: 12px;">各顔の結果</div>
-          <div id="faceList" class="face-list">
-            <div class="sub">まだ結果なし</div>
-          </div>
-        </div>
-
-        <div class="card">
-          <div style="font-size: 18px; font-weight: 800; margin-bottom: 12px;">使い方のコツ</div>
-          <ul class="tips">
-            <li>顔が大きめに写ってる写真が有利</li>
-            <li>ブレが少ない画像を使う</li>
-            <li>逆光より、明るい正面写真が安定</li>
-          </ul>
-        </div>
-      </aside>
-    </section>
-  </div>
-
-  <script>
-    const MODEL_URLS = [
-      './models',
-      'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js/weights',
-      'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights',
-      'https://justadudewhohacks.github.io/face-api.js/models'
-    ];
-
-    const modelStatus = document.getElementById('modelStatus');
-    const fileInput = document.getElementById('fileInput');
-    const analyzeBtn = document.getElementById('analyzeBtn');
-    const clearBtn = document.getElementById('clearBtn');
-    const dropzone = document.getElementById('dropzone');
-    const canvas = document.getElementById('canvas');
-    const placeholder = document.getElementById('placeholder');
-    const ctx = canvas.getContext('2d');
-
-    const mainAge = document.getElementById('mainAge');
-    const mainText = document.getElementById('mainText');
-    const confidenceBar = document.getElementById('confidenceBar');
-    const faceCount = document.getElementById('faceCount');
-    const avgAge = document.getElementById('avgAge');
-    const faceList = document.getElementById('faceList');
-
-    let imageEl = null;
-    let modelsReady = false;
-
-    function setStatus(message, type = 'normal') {
-      modelStatus.textContent = message;
-      if (type === 'ok') {
-        modelStatus.style.color = 'var(--ok)';
-      } else if (type === 'warn') {
-        modelStatus.style.color = 'var(--warn)';
-      } else if (type === 'danger') {
-        modelStatus.style.color = 'var(--danger)';
-      } else {
-        modelStatus.style.color = 'var(--muted)';
-      }
-    }
-
-    function resetResults() {
-      mainAge.textContent = '--';
-      mainText.textContent = '画像を入れると、ここに結果が出るで。';
-      confidenceBar.style.width = '0%';
-      faceCount.textContent = '0';
-      avgAge.textContent = '--';
-      faceList.innerHTML = '<div class="sub">まだ結果なし</div>';
-    }
-
-    function clearCanvas() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      canvas.hidden = true;
-      placeholder.hidden = false;
-      imageEl = null;
-      fileInput.value = '';
-      analyzeBtn.disabled = true;
-      resetResults();
-      if (modelsReady) {
-        setStatus('リセットしたで。新しい画像を入れてな。', 'ok');
-      }
-    }
-
-    function fitCanvasToImage(img) {
-      const maxWidth = Math.max(320, dropzone.clientWidth - 48);
-      const naturalWidth = img.naturalWidth || img.width;
-      const naturalHeight = img.naturalHeight || img.height;
-      const ratio = Math.min(1, maxWidth / naturalWidth);
-      canvas.width = Math.round(naturalWidth * ratio);
-      canvas.height = Math.round(naturalHeight * ratio);
-      canvas.hidden = false;
-      placeholder.hidden = true;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    }
-
-    function readImageFile(file) {
-      if (!file || !file.type.startsWith('image/')) {
-        setStatus('画像ファイルを入れてな。', 'warn');
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onerror = () => {
-        setStatus('画像の読み込みに失敗したで。別の画像で試してな。', 'danger');
-      };
-      reader.onload = () => {
-        const img = new Image();
-        img.onload = () => {
-          imageEl = img;
-          fitCanvasToImage(img);
-          analyzeBtn.disabled = !modelsReady;
-          resetResults();
-          setStatus('画像を読み込んだで。「年齢を判定」を押してな。', 'ok');
-        };
-        img.onerror = () => {
-          setStatus('画像の表示に失敗したで。対応形式を確認してな。', 'danger');
-        };
-        img.src = reader.result;
-      };
-      reader.readAsDataURL(file);
-    }
-
-    async function waitForFaceApi(maxWaitMs = 8000) {
-      const start = Date.now();
-      while (Date.now() - start < maxWaitMs) {
-        if (window.faceapi && window.faceapi.nets) {
-          return window.faceapi;
-        }
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      }
-      throw new Error('face-api.js の読み込み待機がタイムアウトしたで');
-    }
-
-    async function loadModels() {
-      try {
-        setStatus('AIモデルを読み込み中… 初回は少しだけ時間かかるで');
-
-        const faceapi = await waitForFaceApi();
-        const failedUrls = [];
-
-        for (const url of MODEL_URLS) {
-          try {
-            await Promise.all([
-              faceapi.nets.tinyFaceDetector.loadFromUri(url),
-              faceapi.nets.ageGenderNet.loadFromUri(url)
-            ]);
-
-            modelsReady = true;
-            analyzeBtn.disabled = !imageEl;
-            setStatus('モデル準備完了。画像を入れたらすぐ判定できるで。', 'ok');
-            console.log('モデル読み込み成功:', url);
-            return;
-          } catch (err) {
-            failedUrls.push(url);
-            console.warn('モデル読み込み失敗:', url, err);
-          }
+            statusDiv.innerText = "Camera Accessing...";
+            enableCam();
         }
 
-        throw new Error('利用可能なモデルURLが全部失敗したで: ' + failedUrls.join(', '));
-      } catch (error) {
-        console.error(error);
-        modelsReady = false;
-        analyzeBtn.disabled = true;
-        setStatus(
-          'モデル読み込みに失敗したで。\n' +
-          'まずは ./models にモデルを置く方法がいちばん安定や。\n' +
-          'それでもあかんかったらコンソールの詳細エラーを見てな。',
-          'danger'
-        );
-      }
-    }
-
-    async function analyzeFaceAge() {
-      if (!modelsReady || !imageEl || !window.faceapi) {
-        setStatus('まだ解析できへんで。モデル読み込みと画像の準備を確認してな。', 'warn');
-        return;
-      }
-
-      analyzeBtn.disabled = true;
-      setStatus('顔を解析中…', 'warn');
-      resetResults();
-      fitCanvasToImage(imageEl);
-
-      try {
-        const detections = await window.faceapi
-          .detectAllFaces(imageEl, new window.faceapi.TinyFaceDetectorOptions({
-            inputSize: 416,
-            scoreThreshold: 0.35
-          }))
-          .withAgeAndGender();
-
-        if (!detections.length) {
-          setStatus('顔が見つからへんかった。別の写真で試してみてな。', 'danger');
-          mainText.textContent = '顔が検出できへんかったで。正面で明るい写真がええ感じ。';
-          return;
+        function enableCam() {
+            navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } }).then((stream) => {
+                video.srcObject = stream;
+                video.addEventListener("loadeddata", predictWebcam);
+                statusDiv.innerText = "System Online";
+            });
         }
 
-        const displaySize = { width: canvas.width, height: canvas.height };
-        const resized = window.faceapi.resizeResults(detections, displaySize);
+        async function predictWebcam() {
+            canvasElement.width = video.videoWidth;
+            canvasElement.height = video.videoHeight;
 
-        let totalAge = 0;
-        let maxScore = 0;
-        let representative = null;
+            let startTimeMs = performance.now();
+            if (lastVideoTime !== video.currentTime) {
+                lastVideoTime = video.currentTime;
+                const results = poseLandmarker.detectForVideo(video, startTimeMs);
 
-        ctx.drawImage(imageEl, 0, 0, canvas.width, canvas.height);
-        faceList.innerHTML = '';
+                canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+                const drawingUtils = new DrawingUtils(canvasCtx);
 
-        resized.forEach((det, index) => {
-          const { x, y, width, height } = det.detection.box;
-          const age = Math.round(det.age);
-          const score = det.detection.score || 0;
-          const gender = det.gender === 'male' ? '男性寄り' : '女性寄り';
-
-          totalAge += age;
-          if (score > maxScore) {
-            maxScore = score;
-            representative = { age, score, gender };
-          }
-
-          ctx.lineWidth = 3;
-          ctx.strokeStyle = 'rgba(122, 162, 255, 0.95)';
-          ctx.strokeRect(x, y, width, height);
-
-          const label = `#${index + 1}  ${age}歳 / ${gender}`;
-          ctx.font = 'bold 18px sans-serif';
-          const textWidth = ctx.measureText(label).width;
-          const labelHeight = 30;
-          const labelX = x;
-          const labelY = Math.max(0, y - labelHeight - 4);
-
-          ctx.fillStyle = 'rgba(15, 18, 32, 0.85)';
-          ctx.fillRect(labelX, labelY, textWidth + 16, labelHeight);
-          ctx.fillStyle = '#eef2ff';
-          ctx.fillText(label, labelX + 8, labelY + 21);
-
-          const item = document.createElement('div');
-          item.className = 'face-item';
-          item.innerHTML = `
-            <div>
-              <div style="color: var(--muted); font-size: 12px; margin-bottom: 4px;">顔 ${index + 1}</div>
-              <strong>${age}歳</strong>
-            </div>
-            <div style="text-align: right; color: var(--muted);">
-              <div>${gender}</div>
-              <div>信頼度 ${(score * 100).toFixed(1)}%</div>
-            </div>
-          `;
-          faceList.appendChild(item);
-        });
-
-        const average = Math.round(totalAge / resized.length);
-        faceCount.textContent = String(resized.length);
-        avgAge.textContent = `${average}歳`;
-
-        if (representative) {
-          mainAge.textContent = `${representative.age}歳`;
-          mainText.textContent = `いちばん信頼度が高かった顔の推定年齢やで。${representative.gender}として判定。`;
-          confidenceBar.style.width = `${Math.max(6, Math.min(100, representative.score * 100))}%`;
+                if (results.landmarks) {
+                    for (const landmark of results.landmarks) {
+                        // 接続線を描画（白）
+                        drawingUtils.drawConnectors(landmark, PoseLandmarker.POSE_CONNECTIONS, {
+                            color: "#FFFFFF",
+                            lineWidth: 2
+                        });
+                        // 関節点を描画（緑）
+                        drawingUtils.drawLandmarks(landmark, {
+                            radius: 3,
+                            color: "#00FF00"
+                        });
+                    }
+                }
+            }
+            window.requestAnimationFrame(predictWebcam);
         }
 
-        setStatus(`解析完了。${resized.length}人ぶんの顔を検出したで。`, 'ok');
-      } catch (error) {
-        console.error(error);
-        setStatus('解析に失敗したで。画像サイズを変えるか、別画像で試してな。', 'danger');
-      } finally {
-        analyzeBtn.disabled = !imageEl || !modelsReady;
-      }
-    }
-
-    function runSelfChecks() {
-      const checks = [
-        ['modelStatus element', !!modelStatus],
-        ['fileInput element', !!fileInput],
-        ['analyzeBtn element', !!analyzeBtn],
-        ['canvas context', !!ctx]
-      ];
-
-      const failed = checks.filter(([, ok]) => !ok);
-      if (failed.length > 0) {
-        console.error('Self-check failed:', failed);
-        setStatus('初期化に失敗したで。HTMLの要素構成が壊れてる可能性ある。', 'danger');
-        return false;
-      }
-
-      console.log('Self-check passed:', checks);
-      return true;
-    }
-
-    fileInput.addEventListener('change', (e) => {
-      const file = e.target.files && e.target.files[0];
-      if (file) {
-        readImageFile(file);
-      }
-    });
-
-    analyzeBtn.addEventListener('click', analyzeFaceAge);
-    clearBtn.addEventListener('click', clearCanvas);
-
-    ['dragenter', 'dragover'].forEach((eventName) => {
-      dropzone.addEventListener(eventName, (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        dropzone.classList.add('dragover');
-      });
-    });
-
-    ['dragleave', 'drop'].forEach((eventName) => {
-      dropzone.addEventListener(eventName, (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        dropzone.classList.remove('dragover');
-      });
-    });
-
-    dropzone.addEventListener('drop', (e) => {
-      const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-      if (file) {
-        readImageFile(file);
-      }
-    });
-
-    window.addEventListener('resize', () => {
-      if (imageEl) {
-        fitCanvasToImage(imageEl);
-      }
-    });
-
-    resetResults();
-    if (runSelfChecks()) {
-      loadModels();
-    }
-  </script>
+        init();
+    </script>
 </body>
 </html>
