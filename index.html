@@ -3,125 +3,249 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MediaPipe - Skeleton Only</title>
+    <title>Color Sharing Game</title>
     <style>
         body {
-            font-family: 'Courier New', Courier, monospace;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f0f2f5;
             margin: 0;
-            background-color: #050505;
-            color: #00FF00;
+            padding: 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            height: 100vh;
-            overflow: hidden;
         }
         .container {
-            position: relative;
-            width: 640px;
-            height: 480px;
-            border: 2px solid #333;
-            box-shadow: 0 0 20px rgba(0, 255, 0, 0.2);
-        }
-        /* ビデオは処理に必要だが、表示はしない */
-        #webcam {
-            display: none;
-        }
-        /* キャンバスに背景色をつけて骨格だけを見せる */
-        #output_canvas {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            max-width: 500px;
             width: 100%;
-            height: 100%;
-            background-color: #000;
-            transform: rotateY(180deg); /* 鏡合わせにする */
+            text-align: center;
         }
-        .status {
-            position: absolute;
-            top: 10px;
-            font-size: 0.9rem;
+        .screen { display: none; }
+        .active { display: block; }
+        .theme-box {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 20px 0;
+            padding: 15px;
+            background: #eef2ff;
+            border-radius: 8px;
+            color: #4f46e5;
         }
+        .color-picker {
+            margin: 20px 0;
+        }
+        input[type="color"] {
+            width: 120px;
+            height: 120px;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        .result-flex {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+        }
+        .result-card {
+            padding: 20px;
+            border-radius: 8px;
+            color: white;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+            width: 40%;
+        }
+        button {
+            background-color: #4f46e5;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        button:hover { background-color: #4338ca; }
     </style>
 </head>
 <body>
 
-    <div class="status" id="status">System Initializing...</div>
+<div class="container">
+    <h1>カラー共有ゲーム</h1>
 
-    <div class="container">
-        <video id="webcam" autoplay playsinline></video>
-        <canvas id="output_canvas"></canvas>
+    <div id="screen-lobby" class="screen active">
+        <button id="btn-create">部屋を作る</button>
+        <p>または</p>
+        <input type="text" id="input-room-id" placeholder="部屋IDを入力">
+        <button id="btn-join">部屋に入る</button>
     </div>
 
-    <script type="module">
-        import {
-            PoseLandmarker,
-            FilesetResolver,
-            DrawingUtils
-        } from "https://cdn.skypack.dev/@mediapipe/tasks-vision@0.10.0";
+    <div id="screen-waiting" class="screen">
+        <p>友達にこの部屋IDを教えてください：</p>
+        <h2 id="display-room-id" style="background:#ddd; padding:10px;"></h2>
+        <p>相手の参加を待っています...</p>
+    </div>
 
-        const video = document.getElementById("webcam");
-        const canvasElement = document.getElementById("output_canvas");
-        const canvasCtx = canvasElement.getContext("2d");
-        const statusDiv = document.getElementById("status");
+    <div id="screen-game" class="screen">
+        <p>今回のお題は...</p>
+        <div id="current-theme" class="theme-box">お題</div>
+        <p>お題に合う色を選んで決定を押してください</p>
+        <div class="color-picker">
+            <input type="color" id="color-select" value="#ff0000">
+        </div>
+        <button id="btn-submit-color">この色で決定！</button>
+        <p id="wait-partner-msg" style="display:none; color:gray;">相手が選び終わるのを待っています...</p>
+    </div>
 
-        let poseLandmarker = undefined;
-        let lastVideoTime = -1;
+    <div id="screen-result" class="screen">
+        <h2>お互いの色が出揃いました！</h2>
+        <p>なぜその色を選んだのか、話し合ってみましょう！</p>
+        <div class="result-flex">
+            <div id="p1-card" class="result-card">プレイヤー1</div>
+            <div id="p2-card" class="result-card">プレイヤー2</div>
+        </div>
+        <br>
+        <button id="btn-restart">次のお題へ</button>
+    </div>
+</div>
 
-        async function init() {
-            const vision = await FilesetResolver.forVisionTasks(
-                "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
-            );
-            
-            poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
-                baseOptions: {
-                    modelAssetPath: `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task`,
-                    delegate: "GPU"
-                },
-                runningMode: "VIDEO"
-            });
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, doc, setDoc, onSnapshot, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-            statusDiv.innerText = "Camera Accessing...";
-            enableCam();
-        }
+    // TODO: ご自身のFirebaseプロジェクトの構成情報に置き換えてください
+    const firebaseConfig = {
+      apiKey: "AIzaSyCTf-qIOAKnKm2UTY37h91KYzjnJtpTLzM",
+      authDomain: "niko-90149.firebaseapp.com",
+      projectId: "niko-90149",
+      storageBucket: "niko-90149.firebasestorage.app",
+      messagingSenderId: "815550233357",
+      appId: "1:815550233357:web:7394c92e2a979ad24b4e44",
+      measurementId: "G-BRRB5EH63N"
+    };
 
-        function enableCam() {
-            navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } }).then((stream) => {
-                video.srcObject = stream;
-                video.addEventListener("loadeddata", predictWebcam);
-                statusDiv.innerText = "System Online";
-            });
-        }
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
 
-        async function predictWebcam() {
-            canvasElement.width = video.videoWidth;
-            canvasElement.height = video.videoHeight;
+    // アプリケーション内の状態管理変数
+    let roomId = "";
+    let myRole = ""; // "player1" または "player2"
+    const themes = ["猫", "初恋", "日曜日", "怒り", "東京", "メロンソーダ", "未来"];
 
-            let startTimeMs = performance.now();
-            if (lastVideoTime !== video.currentTime) {
-                lastVideoTime = video.currentTime;
-                const results = poseLandmarker.detectForVideo(video, startTimeMs);
+    // DOM要素
+    const screens = {
+        lobby: document.getElementById('screen-lobby'),
+        waiting: document.getElementById('screen-waiting'),
+        game: document.getElementById('screen-game'),
+        result: document.getElementById('screen-result')
+    };
 
-                canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-                const drawingUtils = new DrawingUtils(canvasCtx);
+    function switchScreen(screenName) {
+        Object.keys(screens).forEach(key => screens[key].classList.remove('active'));
+        screens[screenName].classList.add('active');
+    }
 
-                if (results.landmarks) {
-                    for (const landmark of results.landmarks) {
-                        // 接続線を描画（白）
-                        drawingUtils.drawConnectors(landmark, PoseLandmarker.POSE_CONNECTIONS, {
-                            color: "#FFFFFF",
-                            lineWidth: 2
-                        });
-                        // 関節点を描画（緑）
-                        drawingUtils.drawLandmarks(landmark, {
-                            radius: 3,
-                            color: "#00FF00"
-                        });
-                    }
-                }
+    // 1. 部屋の作成
+    document.getElementById('btn-create').addEventListener('click', async () => {
+        roomId = Math.random().toString(36).substring(2, 7).toUpperCase(); // 5文字のランダムID
+        myRole = 'player1';
+
+        const randomTheme = themes[Math.floor(Math.random() * themes.length)];
+
+        // Firestoreに部屋を新規作成
+        await setDoc(doc(db, "rooms", roomId), {
+            theme: randomTheme,
+            status: "waiting",
+            player1: { name: "ホスト", color: "#ffffff", isReady: false },
+            player2: { name: "ゲスト", color: "#ffffff", isReady: false }
+        });
+
+        document.getElementById('display-room-id').innerText = roomId;
+        switchScreen('waiting');
+        listenToRoom();
+    });
+
+    // 2. 部屋への参加
+    document.getElementById('btn-join').addEventListener('click', () => {
+        const inputId = document.getElementById('input-room-id').value.trim().toUpperCase();
+        if (!inputId) return alert("部屋IDを入力してください");
+        
+        roomId = inputId;
+        myRole = 'player2';
+
+        // 参加時にステータスを自動で「選択中」に更新
+        updateDoc(doc(db, "rooms", roomId), {
+            status: "selecting"
+        }).then(() => {
+            switchScreen('game');
+            listenToRoom();
+        }).catch(err => {
+            alert("部屋が見つかりません。IDを確認してください。");
+        });
+    });
+
+    // 3. リアルタイム同期の監視
+    function listenToRoom() {
+        onSnapshot(doc(db, "rooms", roomId), (snapshot) => {
+            if (!snapshot.exists()) return;
+            const data = snapshot.data();
+
+            // お題の更新
+            document.getElementById('current-theme').innerText = data.theme;
+
+            // ステータスに応じた画面遷移の制御
+            if (data.status === "selecting" && myRole === 'player1') {
+                switchScreen('game');
             }
-            window.requestAnimationFrame(predictWebcam);
+
+            if (data.status === "result") {
+                document.getElementById('p1-card').style.backgroundColor = data.player1.color;
+                document.getElementById('p1-card').innerText = `プレイヤー1\n${data.player1.color}`;
+                document.getElementById('p2-card').style.backgroundColor = data.player2.color;
+                document.getElementById('p2-card').innerText = `プレイヤー2\n${data.player2.color}`;
+                
+                document.getElementById('wait-partner-msg').style.display = 'none';
+                switchScreen('result');
+            }
+        });
+    }
+
+    // 4. 色の決定ボタン
+    document.getElementById('btn-submit-color').addEventListener('click', async () => {
+        const selectedColor = document.getElementById('color-select').value;
+        document.getElementById('btn-submit-color').style.display = 'none';
+        document.getElementById('wait-partner-msg').style.display = 'block';
+
+        const roomRef = doc(db, "rooms", roomId);
+        
+        // 自分の役割の方のデータを更新
+        if (myRole === 'player1') {
+            await updateDoc(roomRef, { "player1.color": selectedColor, "player1.isReady": true });
+        } else {
+            await updateDoc(roomRef, { "player2.color": selectedColor, "player2.isReady": true });
         }
 
-        init();
-    </script>
+        // 両方準備ができたか確認して結果画面へトリガー（一瞬のラグ防止のため再度取得）
+        onSnapshot(roomRef, async (snapshot) => {
+            const data = snapshot.data();
+            if (data.player1.isReady && data.player2.isReady && data.status !== "result") {
+                await updateDoc(roomRef, { status: "result" });
+            }
+        });
+    });
+
+    // 5. リスタート（次のお題へ）
+    document.getElementById('btn-restart').addEventListener('click', async () => {
+        const randomTheme = themes[Math.floor(Math.random() * themes.length)];
+        document.getElementById('btn-submit-color').style.display = 'inline-block';
+        
+        await updateDoc(doc(db, "rooms", roomId), {
+            theme: randomTheme,
+            status: "selecting",
+            "player1.isReady": false,
+            "player2.isReady": false
+        });
+    });
+</script>
 </body>
 </html>
