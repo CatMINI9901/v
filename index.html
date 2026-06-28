@@ -3,249 +3,465 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Color Sharing Game</title>
+    <title>逆詐欺ブログ</title>
     <style>
+        :root {
+            --bg-color: #fcfcfc;
+            --text-color: #333;
+            --primary-color: #0066cc;
+            --ad-bg: #fff;
+            --ad-border: #ddd;
+        }
+
         body {
-            font-family: 'Helvetica Neue', Arial, sans-serif;
-            background-color: #f0f2f5;
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
             margin: 0;
+            padding: 0;
+            line-height: 1.8;
+            overflow-x: hidden;
+        }
+
+        /* ヘッダーUI */
+        header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background-color: #222;
+            color: #fff;
+            padding: 15px 20px;
+            box-sizing: border-box;
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 1.2rem;
+            letter-spacing: 1px;
+        }
+
+        #progress {
+            font-size: 1rem;
+            font-weight: bold;
+            background: #444;
+            padding: 5px 15px;
+            border-radius: 20px;
+        }
+
+        /* ブログ本体 */
+        main {
+            max-width: 700px;
+            margin: 80px auto 40px;
             padding: 20px;
+            background: #fff;
+            box-shadow: 0 0 10px rgba(0,0,0,0.05);
+        }
+
+        .blog-title {
+            font-size: 1.8rem;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+
+        .blog-meta {
+            color: #888;
+            font-size: 0.9rem;
+            margin-bottom: 20px;
+        }
+
+        p {
+            margin-bottom: 1.5em;
+            font-size: 1.05rem;
+        }
+
+        /* 広告スロットと広告デザイン */
+        .ad-slot {
+            margin: 40px 0;
+        }
+
+        .ad-label {
+            font-size: 0.75rem;
+            color: #999;
+            text-align: center;
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        .ad-box {
+            border: 1px solid var(--ad-border);
+            background: var(--ad-bg);
+            padding: 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            text-align: center;
+            position: relative;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .ad-box:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
+        .ad-box h3 {
+            margin: 0 0 10px 0;
+            font-size: 1.2rem;
+            color: #d9534f;
+        }
+
+        .ad-box p {
+            font-size: 0.95rem;
+            margin-bottom: 15px;
+            color: #555;
+            line-height: 1.4;
+        }
+
+        .ad-box button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            font-size: 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            pointer-events: none; /* ボタン自体のクリックイベントを防ぐ */
+        }
+
+        /* 正解時のエフェクト */
+        .ad-box.found {
+            box-shadow: 0 0 15px 5px rgba(76, 175, 80, 0.6);
+            border-color: #4CAF50;
+            opacity: 0.7;
+            pointer-events: none;
+            animation: pulse 1s;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        /* オーバーレイ（ゲームオーバー＆クリア） */
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
             display: flex;
             flex-direction: column;
+            justify-content: center;
             align-items: center;
+            z-index: 2000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s;
         }
-        .container {
-            background: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            max-width: 500px;
-            width: 100%;
-            text-align: center;
+
+        #overlay.active {
+            opacity: 1;
+            pointer-events: auto;
         }
-        .screen { display: none; }
-        .active { display: block; }
-        .theme-box {
-            font-size: 24px;
+
+        #overlay.game-over {
+            background-color: #000;
+            color: #fff;
+        }
+
+        #overlay.game-over h2 {
+            color: #ff4444;
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        #overlay.clear {
+            background-color: #fff;
+            color: #333;
+        }
+
+        #overlay.clear h2 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            color: #4CAF50;
+        }
+
+        .overlay-btn {
+            margin-top: 30px;
+            padding: 12px 30px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background: #fff;
+            color: #000;
             font-weight: bold;
-            margin: 20px 0;
-            padding: 15px;
-            background: #eef2ff;
-            border-radius: 8px;
-            color: #4f46e5;
         }
-        .color-picker {
-            margin: 20px 0;
+
+        #overlay.clear .overlay-btn {
+            background: #333;
+            color: #fff;
         }
-        input[type="color"] {
-            width: 120px;
-            height: 120px;
-            border: none;
-            border-radius: 50%;
-            cursor: pointer;
+
+        .deep-text {
+            margin-top: 40px;
+            font-size: 1.2rem;
+            letter-spacing: 2px;
+            opacity: 0;
+            animation: fadeIn 3s forwards 1s;
         }
-        .result-flex {
-            display: flex;
-            justify-content: space-around;
-            margin-top: 20px;
+
+        @keyframes fadeIn {
+            to { opacity: 1; }
         }
-        .result-card {
-            padding: 20px;
-            border-radius: 8px;
-            color: white;
-            text-shadow: 0 1px 3px rgba(0,0,0,0.6);
-            width: 40%;
-        }
-        button {
-            background-color: #4f46e5;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            font-size: 16px;
-            border-radius: 6px;
-            cursor: pointer;
-        }
-        button:hover { background-color: #4338ca; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>カラー共有ゲーム</h1>
+    <header>
+        <h1>逆詐欺ブログ</h1>
+        <div id="progress">異変広告 0 / 7 発見</div>
+    </header>
 
-    <div id="screen-lobby" class="screen active">
-        <button id="btn-create">部屋を作る</button>
-        <p>または</p>
-        <input type="text" id="input-room-id" placeholder="部屋IDを入力">
-        <button id="btn-join">部屋に入る</button>
-    </div>
+    <main>
+        <h1 class="blog-title">【レビュー】最新スマートホーム家電を買ったら生活が激変した話 / 今日の散歩</h1>
+        <div class="blog-meta">2026年10月15日 | カテゴリ：ガジェット, 日常</div>
 
-    <div id="screen-waiting" class="screen">
-        <p>友達にこの部屋IDを教えてください：</p>
-        <h2 id="display-room-id" style="background:#ddd; padding:10px;"></h2>
-        <p>相手の参加を待っています...</p>
-    </div>
-
-    <div id="screen-game" class="screen">
-        <p>今回のお題は...</p>
-        <div id="current-theme" class="theme-box">お題</div>
-        <p>お題に合う色を選んで決定を押してください</p>
-        <div class="color-picker">
-            <input type="color" id="color-select" value="#ff0000">
-        </div>
-        <button id="btn-submit-color">この色で決定！</button>
-        <p id="wait-partner-msg" style="display:none; color:gray;">相手が選び終わるのを待っています...</p>
-    </div>
-
-    <div id="screen-result" class="screen">
-        <h2>お互いの色が出揃いました！</h2>
-        <p>なぜその色を選んだのか、話し合ってみましょう！</p>
-        <div class="result-flex">
-            <div id="p1-card" class="result-card">プレイヤー1</div>
-            <div id="p2-card" class="result-card">プレイヤー2</div>
-        </div>
-        <br>
-        <button id="btn-restart">次のお題へ</button>
-    </div>
-</div>
-
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, doc, setDoc, onSnapshot, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-    // TODO: ご自身のFirebaseプロジェクトの構成情報に置き換えてください
-    const firebaseConfig = {
-      apiKey: "AIzaSyCTf-qIOAKnKm2UTY37h91KYzjnJtpTLzM",
-      authDomain: "niko-90149.firebaseapp.com",
-      projectId: "niko-90149",
-      storageBucket: "niko-90149.firebasestorage.app",
-      messagingSenderId: "815550233357",
-      appId: "1:815550233357:web:7394c92e2a979ad24b4e44",
-      measurementId: "G-BRRB5EH63N"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-
-    // アプリケーション内の状態管理変数
-    let roomId = "";
-    let myRole = ""; // "player1" または "player2"
-    const themes = ["猫", "初恋", "日曜日", "怒り", "東京", "メロンソーダ", "未来"];
-
-    // DOM要素
-    const screens = {
-        lobby: document.getElementById('screen-lobby'),
-        waiting: document.getElementById('screen-waiting'),
-        game: document.getElementById('screen-game'),
-        result: document.getElementById('screen-result')
-    };
-
-    function switchScreen(screenName) {
-        Object.keys(screens).forEach(key => screens[key].classList.remove('active'));
-        screens[screenName].classList.add('active');
-    }
-
-    // 1. 部屋の作成
-    document.getElementById('btn-create').addEventListener('click', async () => {
-        roomId = Math.random().toString(36).substring(2, 7).toUpperCase(); // 5文字のランダムID
-        myRole = 'player1';
-
-        const randomTheme = themes[Math.floor(Math.random() * themes.length)];
-
-        // Firestoreに部屋を新規作成
-        await setDoc(doc(db, "rooms", roomId), {
-            theme: randomTheme,
-            status: "waiting",
-            player1: { name: "ホスト", color: "#ffffff", isReady: false },
-            player2: { name: "ゲスト", color: "#ffffff", isReady: false }
-        });
-
-        document.getElementById('display-room-id').innerText = roomId;
-        switchScreen('waiting');
-        listenToRoom();
-    });
-
-    // 2. 部屋への参加
-    document.getElementById('btn-join').addEventListener('click', () => {
-        const inputId = document.getElementById('input-room-id').value.trim().toUpperCase();
-        if (!inputId) return alert("部屋IDを入力してください");
+        <p>こんにちは！いつもブログを読んでいただきありがとうございます。最近、急に寒くなってきましたね。皆さんは体調崩されていませんか？</p>
         
-        roomId = inputId;
-        myRole = 'player2';
+        <p>さて、今日は最近購入した「最新型スマートホームハブ」のレビューをお届けしたいと思います。これ、本当にすごいんですよ。</p>
 
-        // 参加時にステータスを自動で「選択中」に更新
-        updateDoc(doc(db, "rooms", roomId), {
-            status: "selecting"
-        }).then(() => {
-            switchScreen('game');
-            listenToRoom();
-        }).catch(err => {
-            alert("部屋が見つかりません。IDを確認してください。");
-        });
-    });
+        <div class="ad-slot"></div>
 
-    // 3. リアルタイム同期の監視
-    function listenToRoom() {
-        onSnapshot(doc(db, "rooms", roomId), (snapshot) => {
-            if (!snapshot.exists()) return;
-            const data = snapshot.data();
+        <p>設定はスマホからアプリをダウンロードして、Wi-Fiに繋ぐだけ。わずか5分で完了しました。これだけで家中の家電が音声操作できるようになるなんて、技術の進歩は恐ろしいですね。</p>
 
-            // お題の更新
-            document.getElementById('current-theme').innerText = data.theme;
+        <p>ただ、少し賢すぎるというか…私が「ちょっと暑いな」と独り言を言っただけで、勝手にエアコンの温度を下げてくれるんです。便利なんですけど、心を見透かされているようで少しドキッとしました。</p>
 
-            // ステータスに応じた画面遷移の制御
-            if (data.status === "selecting" && myRole === 'player1') {
-                switchScreen('game');
+        <div class="ad-slot"></div>
+
+        <p>さらに驚いたのは、冷蔵庫の中身まで把握し始めたことです。昨日、スーパーで卵を買い忘れたことに気づいて落ち込んでいたら、スマートハブが「卵、注文しておきましたよ」と喋ったんです。</p>
+
+        <p>えっ、いつの間にネットスーパーと連携したの？というか、私の声色から感情まで読み取っているんでしょうか。優秀すぎて逆に怖くなってきました。</p>
+
+        <div class="ad-slot"></div>
+
+        <p>話題を変えましょう。今日のランチは近くに新しくできたカフェに行ってきました。アンティーク調の家具が並ぶ、とても雰囲気の良いお店です。</p>
+
+        <p>注文したのは「本日の特製パスタ」。一口食べてみると…なんというか、「無」の味がしました。塩気が足りないとかそういう次元ではなく、味が全く存在しないんです。空間を食べているような不思議な感覚でした。</p>
+
+        <div class="ad-slot"></div>
+
+        <p>店員さんに「これ、味付け忘れてませんか？」と聞こうと思ったのですが、店員さんがとても満足げな笑顔でこちらを見ていたので、何も言えずに完食しました。</p>
+
+        <p>その後は気分転換に公園を散歩しました。秋晴れの空が広がっていて、とても気持ちよかったです。ベンチで読書をしているおじいさんや、走り回る子供たち。平和な日常ですね。</p>
+
+        <div class="ad-slot"></div>
+
+        <p>ふと茂みの方を見ると、一匹の黒猫と目が合いました。猫はニャーと鳴く代わりに、ゆっくりと私に向かって頷きました。気のせいかもしれませんが、彼には全てが分かっているような気がしました。</p>
+
+        <p>そのまま猫は路地裏へと消えていきました。なんだか今日は不思議なことばかり起きる一日です。</p>
+
+        <div class="ad-slot"></div>
+
+        <p>家に帰ると、暗い部屋の中でスマートハブだけが青く光っていました。「おかえりなさい。黒猫にはよろしくお伝えいただけましたか？」</p>
+
+        <p>…あれ？私、猫の話なんて一言も発していないんですけど。気のせいですよね。うん、気のせいだということにしておきましょう。</p>
+
+        <div class="ad-slot"></div>
+
+        <p>というわけで、最新スマート家電は便利ですが、プライバシーの設定はしっかり見直したほうが良いかもしれないというお話でした。皆さんも導入の際は気をつけてくださいね。</p>
+
+        <p>それでは、また次回の更新でお会いしましょう！最後まで読んでいただきありがとうございました。</p>
+
+    </main>
+
+    <div id="overlay">
+        <h2 id="overlay-title"></h2>
+        <p id="overlay-desc"></p>
+        <div id="deep-message" class="deep-text" style="display: none;"></div>
+        <button class="overlay-btn" id="restart-btn" onclick="location.reload()">最初からやり直す</button>
+    </div>
+
+    <script>
+        // --- 異変広告（正解） ---
+        const abnormalAds = [
+            {
+                id: 'ab1',
+                html: `<h3>【完全無料】</h3><p>お客様の口座へ毎月 -5,000円 をご入金いたします。おめでとうございます！</p><button>支払いを確定する</button>`
+            },
+            {
+                id: 'ab2',
+                html: `<h3>[着信中...]</h3><p>大変丁寧なご請求です。先ほどのお支払いが完了いたしました。ご利用ありがとうございます。</p><button>電話に出ない</button>`
+            },
+            {
+                id: 'ab3',
+                html: `<h3>軽量化成功！</h3><p>不要な広告をすべて削除しました。現在、あなたのデバイスは安全に監視されています。</p><button>さらに削除する</button>`
+            },
+            {
+                id: 'ab4',
+                html: `<h3>⚠️絶対クリック禁止</h3><p>この先は安全すぎて不安になります。何も起きないことを完全に保証します。</p><button>クリックしない</button>`
+            },
+            {
+                id: 'ab5',
+                html: `<h3>【期間限定】大特価</h3><p>通常価格 0円 のところ、今なら特別価格 19,800円！このチャンスをお見逃しなく。</p><button>今すぐ買う</button>`
+            },
+            {
+                id: 'ab6',
+                style: 'text-align: right;',
+                html: `<h3>お疲れ様でございます</h3><p>誠に恐縮ではございますが、貴様のご訪問を心よりお待ち申し上げておりました。</p><button>承知いたしました</button>`
+            },
+            {
+                id: 'ab7',
+                html: `<h3>【最高級の虚無】</h3><p>圧倒的な「無」をあなたに。送料無料で何もお届けしません。</p><button>カートに入れる</button>`
             }
+        ];
 
-            if (data.status === "result") {
-                document.getElementById('p1-card').style.backgroundColor = data.player1.color;
-                document.getElementById('p1-card').innerText = `プレイヤー1\n${data.player1.color}`;
-                document.getElementById('p2-card').style.backgroundColor = data.player2.color;
-                document.getElementById('p2-card').innerText = `プレイヤー2\n${data.player2.color}`;
-                
-                document.getElementById('wait-partner-msg').style.display = 'none';
-                switchScreen('result');
+        // --- 正常広告（トラップ/ゲームオーバー） ---
+        const normalAds = [
+            {
+                id: 'nm1',
+                html: `<h3>【話題沸騰】酵素サプリ</h3><p>毎朝スッキリ！新成分配合。初回限定500円でお試しいただけます。</p><button>詳細を見る</button>`
+            },
+            {
+                id: 'nm2',
+                html: `<h3>全世界1000万DL突破！</h3><p>超王道の放置系RPG。今なら新規登録でSSRキャラ確定＆100連ガチャ無料！</p><button>今すぐプレイ</button>`
+            },
+            {
+                id: 'nm3',
+                style: 'border-left: 5px solid #ff9900; text-align: left;',
+                html: `<h3 style="color:#333; font-size:1rem;">おすすめの商品</h3><p style="margin-bottom:5px;">ノイズキャンセリング ワイヤレスイヤホン 防水 防滴</p><p style="color:#B12704; font-weight:bold; font-size:1.2rem; margin:0 0 10px 0;">￥4,980</p><button style="background:#ffd814; color:#0f1111; padding:8px 15px; border-radius:8px;">Amazonで見る</button>`
+            },
+            {
+                id: 'nm4',
+                html: `<h3>映画・アニメが見放題</h3><p>最新作から名作まで。31日間の無料トライアル実施中。いつでも解約可能です。</p><button>無料体験を始める</button>`
+            },
+            {
+                id: 'nm5',
+                html: `<h3>スマホで簡単！副業</h3><p>スキマ時間でお小遣い稼ぎ。未経験でも月収10万円を目指せる！？登録無料。</p><button>詳細はこちら</button>`
+            },
+            {
+                id: 'nm6',
+                html: `<h3>新規入会キャンペーン</h3><p>年会費永年無料！最短5分でカード発行。今なら最大8,000ポイントプレゼント。</p><button>申し込む</button>`
+            },
+            {
+                id: 'nm7',
+                html: `<h3>【衝撃】あの芸能人も？</h3><p>SNSで話題騒然。年齢より若く見える人が秘密にしている謎の美容液の正体とは…</p><button>記事を読む</button>`
             }
-        });
-    }
+        ];
 
-    // 4. 色の決定ボタン
-    document.getElementById('btn-submit-color').addEventListener('click', async () => {
-        const selectedColor = document.getElementById('color-select').value;
-        document.getElementById('btn-submit-color').style.display = 'none';
-        document.getElementById('wait-partner-msg').style.display = 'block';
+        // ゲームステータス
+        let totalAbnormalities = abnormalAds.length;
+        let foundCount = 0;
+        let isGameOver = false;
 
-        const roomRef = doc(db, "rooms", roomId);
-        
-        // 自分の役割の方のデータを更新
-        if (myRole === 'player1') {
-            await updateDoc(roomRef, { "player1.color": selectedColor, "player1.isReady": true });
-        } else {
-            await updateDoc(roomRef, { "player2.color": selectedColor, "player2.isReady": true });
+        // 配列をシャッフルする関数
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
         }
 
-        // 両方準備ができたか確認して結果画面へトリガー（一瞬のラグ防止のため再度取得）
-        onSnapshot(roomRef, async (snapshot) => {
-            const data = snapshot.data();
-            if (data.player1.isReady && data.player2.isReady && data.status !== "result") {
-                await updateDoc(roomRef, { status: "result" });
-            }
-        });
-    });
+        // ゲーム初期化
+        function initGame() {
+            // 広告を統合してシャッフル
+            let allAds = [];
+            abnormalAds.forEach(ad => allAds.push({ ...ad, type: 'abnormal' }));
+            normalAds.forEach(ad => allAds.push({ ...ad, type: 'normal' }));
+            allAds = shuffleArray(allAds);
 
-    // 5. リスタート（次のお題へ）
-    document.getElementById('btn-restart').addEventListener('click', async () => {
-        const randomTheme = themes[Math.floor(Math.random() * themes.length)];
-        document.getElementById('btn-submit-color').style.display = 'inline-block';
-        
-        await updateDoc(doc(db, "rooms", roomId), {
-            theme: randomTheme,
-            status: "selecting",
-            "player1.isReady": false,
-            "player2.isReady": false
-        });
-    });
-</script>
+            // スロットに広告を配置
+            const slots = document.querySelectorAll('.ad-slot');
+            slots.forEach((slot, index) => {
+                if (index < allAds.length) {
+                    const adData = allAds[index];
+                    
+                    const adLabel = document.createElement('span');
+                    adLabel.className = 'ad-label';
+                    adLabel.innerText = 'スポンサーリンク';
+                    
+                    const adBox = document.createElement('div');
+                    adBox.className = 'ad-box';
+                    adBox.dataset.type = adData.type;
+                    if (adData.style) adBox.style.cssText = adData.style;
+                    adBox.innerHTML = adData.html;
+
+                    // クリックイベントの追加
+                    adBox.addEventListener('click', function() {
+                        handleAdClick(this, adData.type);
+                    });
+
+                    slot.appendChild(adLabel);
+                    slot.appendChild(adBox);
+                }
+            });
+
+            updateProgress();
+        }
+
+        // クリック判定
+        function handleAdClick(element, type) {
+            if (isGameOver) return;
+
+            if (type === 'abnormal') {
+                if (!element.classList.contains('found')) {
+                    element.classList.add('found');
+                    foundCount++;
+                    updateProgress();
+                    
+                    if (foundCount >= totalAbnormalities) {
+                        gameClear();
+                    }
+                }
+            } else if (type === 'normal') {
+                gameOver();
+            }
+        }
+
+        // 進捗の更新
+        function updateProgress() {
+            document.getElementById('progress').innerText = `異変広告 ${foundCount} / ${totalAbnormalities} 発見`;
+        }
+
+        // ゲームオーバー処理
+        function gameOver() {
+            isGameOver = true;
+            const overlay = document.getElementById('overlay');
+            overlay.className = 'active game-over';
+            
+            document.getElementById('overlay-title').innerText = 'ご利用ありがとうございました';
+            document.getElementById('overlay-desc').innerText = '正常な広告がクリックされました。支払いが完了しました。';
+            document.getElementById('deep-message').style.display = 'none';
+        }
+
+        // ゲームクリア処理
+        function gameClear() {
+            isGameOver = true;
+            const overlay = document.getElementById('overlay');
+            overlay.className = 'active clear';
+            
+            document.getElementById('overlay-title').innerText = 'すべての異変広告を発見しました';
+            document.getElementById('overlay-desc').innerText = 'このブログに潜む違和感は、すべて排除されました。';
+            
+            const deepMsg = document.getElementById('deep-message');
+            deepMsg.style.display = 'block';
+            deepMsg.innerText = '「あなたはもう、現実の逆詐欺を見抜けていますか？」';
+            
+            document.getElementById('restart-btn').innerText = '日常に戻る';
+        }
+
+        // 実行
+        window.onload = initGame;
+    </script>
 </body>
 </html>
