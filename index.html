@@ -3,465 +3,385 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>逆詐欺ブログ</title>
+    <title>無限ひらがな・名前発掘ジェネレーター XP</title>
     <style>
+        /* Windows XP (Luna Blue) 風デザイン */
         :root {
-            --bg-color: #fcfcfc;
-            --text-color: #333;
-            --primary-color: #0066cc;
-            --ad-bg: #fff;
-            --ad-border: #ddd;
+            --xp-blue-dark: #002e99;
+            --xp-blue-mid: #0056e0;
+            --xp-blue-light: #3a93ff;
+            --xp-bg: #ece9d8;
+            --xp-window-border: #0054e3;
         }
 
         body {
-            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            margin: 0;
-            padding: 0;
-            line-height: 1.8;
-            overflow-x: hidden;
+            /* XPのデスクトップ背景（青空）をイメージしたグラデーション */
+            background: linear-gradient(to bottom, #7abcff 0%, #60abf8 44%, #4c9be8 100%);
+            font-family: "MS UI Gothic", "Segoe UI", sans-serif;
+            font-size: 13px;
+            color: #000000;
+            margin: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 95vh;
         }
 
-        /* ヘッダーUI */
-        header {
-            position: fixed;
-            top: 0;
-            left: 0;
+        /* XPスタイルのウィンドウ */
+        .window {
+            background-color: var(--xp-bg);
+            border: 3px solid var(--xp-window-border);
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
             width: 100%;
-            background-color: #222;
-            color: #fff;
-            padding: 15px 20px;
-            box-sizing: border-box;
-            z-index: 1000;
+            max-width: 900px;
+        }
+
+        /* あの特徴的な青いタイトルバー */
+        .title-bar {
+            background: linear-gradient(to bottom, #0058e6 0%, #3a93ff 8%, #0056e0 88%, #002e99 100%);
+            color: #ffffff;
+            padding: 5px 8px;
+            font-weight: bold;
+            font-size: 14px;
+            text-shadow: 1px 1px 1px #000;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            border-top-left-radius: 5px;
+            border-top-right-radius: 5px;
         }
 
-        header h1 {
-            margin: 0;
-            font-size: 1.2rem;
-            letter-spacing: 1px;
-        }
-
-        #progress {
-            font-size: 1rem;
+        /* 懐かしい赤色の「×」ボタン */
+        .btn-close {
+            background: linear-gradient(to bottom, #e76049 0%, #b82d14 100%);
+            border: 1px solid #7c1a0a;
+            border-radius: 3px;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+            color: #ffffff;
+            font-size: 11px;
             font-weight: bold;
-            background: #444;
-            padding: 5px 15px;
-            border-radius: 20px;
-        }
-
-        /* ブログ本体 */
-        main {
-            max-width: 700px;
-            margin: 80px auto 40px;
-            padding: 20px;
-            background: #fff;
-            box-shadow: 0 0 10px rgba(0,0,0,0.05);
-        }
-
-        .blog-title {
-            font-size: 1.8rem;
-            border-bottom: 2px solid #eee;
-            padding-bottom: 10px;
-            margin-bottom: 30px;
-        }
-
-        .blog-meta {
-            color: #888;
-            font-size: 0.9rem;
-            margin-bottom: 20px;
-        }
-
-        p {
-            margin-bottom: 1.5em;
-            font-size: 1.05rem;
-        }
-
-        /* 広告スロットと広告デザイン */
-        .ad-slot {
-            margin: 40px 0;
-        }
-
-        .ad-label {
-            font-size: 0.75rem;
-            color: #999;
-            text-align: center;
-            margin-bottom: 5px;
-            display: block;
-        }
-
-        .ad-box {
-            border: 1px solid var(--ad-border);
-            background: var(--ad-bg);
-            padding: 20px;
-            border-radius: 8px;
+            width: 21px;
+            height: 21px;
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-            text-align: center;
-            position: relative;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-
-        .ad-box:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-        }
-
-        .ad-box h3 {
-            margin: 0 0 10px 0;
-            font-size: 1.2rem;
-            color: #d9534f;
-        }
-
-        .ad-box p {
-            font-size: 0.95rem;
-            margin-bottom: 15px;
-            color: #555;
-            line-height: 1.4;
-        }
-
-        .ad-box button {
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            padding: 10px 25px;
-            font-size: 1rem;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-            pointer-events: none; /* ボタン自体のクリックイベントを防ぐ */
-        }
-
-        /* 正解時のエフェクト */
-        .ad-box.found {
-            box-shadow: 0 0 15px 5px rgba(76, 175, 80, 0.6);
-            border-color: #4CAF50;
-            opacity: 0.7;
-            pointer-events: none;
-            animation: pulse 1s;
-        }
-
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
-        }
-
-        /* オーバーレイ（ゲームオーバー＆クリア） */
-        #overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
             display: flex;
-            flex-direction: column;
             justify-content: center;
             align-items: center;
-            z-index: 2000;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.5s;
+        }
+        .btn-close:active {
+            background: linear-gradient(to bottom, #b82d14 0%, #e76049 100%);
         }
 
-        #overlay.active {
-            opacity: 1;
-            pointer-events: auto;
+        .content {
+            padding: 12px;
         }
 
-        #overlay.game-over {
-            background-color: #000;
-            color: #fff;
+        /* 設定パネル */
+        fieldset {
+            border: 1px solid #919b9c;
+            border-radius: 4px;
+            margin-bottom: 12px;
+            padding: 12px;
+            background-color: #f1efe2;
         }
 
-        #overlay.game-over h2 {
-            color: #ff4444;
-            font-size: 2rem;
-            margin-bottom: 10px;
+        legend {
+            font-weight: bold;
+            color: #003c74;
+            padding: 0 6px;
         }
 
-        #overlay.clear {
-            background-color: #fff;
+        .control-panel {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: flex-end;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        label {
             color: #333;
         }
 
-        #overlay.clear h2 {
-            font-size: 2.5rem;
-            margin-bottom: 20px;
-            color: #4CAF50;
+        input, select {
+            padding: 4px;
+            border: 1px solid #7f9db9;
+            background-color: #ffffff;
+            font-size: 14px;
         }
 
-        .overlay-btn {
-            margin-top: 30px;
-            padding: 12px 30px;
-            font-size: 1.1rem;
+        /* XP風の立体感のあるメインボタン */
+        button.btn-execute {
+            background: linear-gradient(to bottom, #ffffff 0%, #eaeaea 30%, #dcdcdc 70%, #cecece 100%);
+            border: 1px solid #003c74;
+            border-radius: 3px;
+            padding: 6px 16px;
+            font-size: 14px;
+            font-weight: bold;
             cursor: pointer;
-            border: none;
-            border-radius: 5px;
-            background: #fff;
+            box-shadow: inset 0 1px 0 #fff;
             color: #000;
+        }
+        button.btn-execute:hover {
+            background: linear-gradient(to bottom, #fff4cc 0%, #ffdf99 100%);
+            border-color: #ff9900;
+        }
+        button.btn-execute:active {
+            background: linear-gradient(to bottom, #dcdcdc 0%, #ffffff 100%);
+        }
+
+        /* ステータスバー */
+        .status-bar {
+            border: 1px solid #919b9c;
+            padding: 6px;
+            margin-bottom: 12px;
+            background-color: #e5e2d3;
+            display: flex;
+            gap: 20px;
             font-weight: bold;
         }
 
-        #overlay.clear .overlay-btn {
-            background: #333;
-            color: #fff;
+        /* 画面分割レイアウト */
+        .main-layout {
+            display: grid;
+            grid-template-columns: 3fr 1fr;
+            gap: 12px;
+        }
+        @media (max-width: 650px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+            }
         }
 
-        .deep-text {
-            margin-top: 40px;
-            font-size: 1.2rem;
-            letter-spacing: 2px;
-            opacity: 0;
-            animation: fadeIn 3s forwards 1s;
+        /* 左側：メイン出力画面 */
+        .output-container {
+            border: 1px solid #7f9db9;
+            background-color: #ffffff;
+            height: 380px;
+            overflow-y: scroll;
+            padding: 6px;
+            font-family: "MS Gothic", monospace;
+            font-size: 15px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-break: break-all;
         }
 
-        @keyframes fadeIn {
-            to { opacity: 1; }
+        /* 右側：何行目か調べられる奴（ナビゲーター） */
+        .navigator-container {
+            border: 1px solid #7f9db9;
+            background-color: #fbfbfa;
+            height: 380px;
+            display: flex;
+            flex-direction: column;
+        }
+        .navigator-header {
+            background-color: #dedbc7;
+            padding: 6px;
+            font-weight: bold;
+            border-bottom: 1px solid #919b9c;
+            color: #003c74;
+            text-align: center;
+        }
+        .navigator-list {
+            overflow-y: auto;
+            flex-grow: 1;
+            padding: 4px;
+        }
+        .nav-item {
+            display: block;
+            width: 100%;
+            padding: 4px 6px;
+            margin-bottom: 2px;
+            background-color: #ffffff;
+            border: 1px solid #dcdcdc;
+            border-radius: 2px;
+            text-align: left;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .nav-item:hover {
+            background-color: #316ac5;
+            color: #ffffff;
+            border-color: #316ac5;
+        }
+
+        /* ハイライト表現 */
+        .highlight {
+            background-color: #ff3333;
+            color: #ffffff;
+            font-weight: bold;
+            padding: 0 2px;
+        }
+
+        .line-number {
+            color: #999999;
+            font-size: 12px;
+            margin-right: 8px;
+            display: inline-block;
+            width: 50px;
+        }
+
+        .row-data {
+            padding: 1px 4px;
+            transition: background-color 0.5s;
+        }
+        .row-data.hit {
+            background-color: #fff2bf;
+        }
+        
+        /* ジャンプした時に一瞬光らせるエフェクト */
+        .row-data.flash {
+            background-color: #ff9900 !important;
+            color: white;
         }
     </style>
 </head>
 <body>
 
-    <header>
-        <h1>逆詐欺ブログ</h1>
-        <div id="progress">異変広告 0 / 7 発見</div>
-    </header>
-
-    <main>
-        <h1 class="blog-title">【レビュー】最新スマートホーム家電を買ったら生活が激変した話 / 今日の散歩</h1>
-        <div class="blog-meta">2026年10月15日 | カテゴリ：ガジェット, 日常</div>
-
-        <p>こんにちは！いつもブログを読んでいただきありがとうございます。最近、急に寒くなってきましたね。皆さんは体調崩されていませんか？</p>
-        
-        <p>さて、今日は最近購入した「最新型スマートホームハブ」のレビューをお届けしたいと思います。これ、本当にすごいんですよ。</p>
-
-        <div class="ad-slot"></div>
-
-        <p>設定はスマホからアプリをダウンロードして、Wi-Fiに繋ぐだけ。わずか5分で完了しました。これだけで家中の家電が音声操作できるようになるなんて、技術の進歩は恐ろしいですね。</p>
-
-        <p>ただ、少し賢すぎるというか…私が「ちょっと暑いな」と独り言を言っただけで、勝手にエアコンの温度を下げてくれるんです。便利なんですけど、心を見透かされているようで少しドキッとしました。</p>
-
-        <div class="ad-slot"></div>
-
-        <p>さらに驚いたのは、冷蔵庫の中身まで把握し始めたことです。昨日、スーパーで卵を買い忘れたことに気づいて落ち込んでいたら、スマートハブが「卵、注文しておきましたよ」と喋ったんです。</p>
-
-        <p>えっ、いつの間にネットスーパーと連携したの？というか、私の声色から感情まで読み取っているんでしょうか。優秀すぎて逆に怖くなってきました。</p>
-
-        <div class="ad-slot"></div>
-
-        <p>話題を変えましょう。今日のランチは近くに新しくできたカフェに行ってきました。アンティーク調の家具が並ぶ、とても雰囲気の良いお店です。</p>
-
-        <p>注文したのは「本日の特製パスタ」。一口食べてみると…なんというか、「無」の味がしました。塩気が足りないとかそういう次元ではなく、味が全く存在しないんです。空間を食べているような不思議な感覚でした。</p>
-
-        <div class="ad-slot"></div>
-
-        <p>店員さんに「これ、味付け忘れてませんか？」と聞こうと思ったのですが、店員さんがとても満足げな笑顔でこちらを見ていたので、何も言えずに完食しました。</p>
-
-        <p>その後は気分転換に公園を散歩しました。秋晴れの空が広がっていて、とても気持ちよかったです。ベンチで読書をしているおじいさんや、走り回る子供たち。平和な日常ですね。</p>
-
-        <div class="ad-slot"></div>
-
-        <p>ふと茂みの方を見ると、一匹の黒猫と目が合いました。猫はニャーと鳴く代わりに、ゆっくりと私に向かって頷きました。気のせいかもしれませんが、彼には全てが分かっているような気がしました。</p>
-
-        <p>そのまま猫は路地裏へと消えていきました。なんだか今日は不思議なことばかり起きる一日です。</p>
-
-        <div class="ad-slot"></div>
-
-        <p>家に帰ると、暗い部屋の中でスマートハブだけが青く光っていました。「おかえりなさい。黒猫にはよろしくお伝えいただけましたか？」</p>
-
-        <p>…あれ？私、猫の話なんて一言も発していないんですけど。気のせいですよね。うん、気のせいだということにしておきましょう。</p>
-
-        <div class="ad-slot"></div>
-
-        <p>というわけで、最新スマート家電は便利ですが、プライバシーの設定はしっかり見直したほうが良いかもしれないというお話でした。皆さんも導入の際は気をつけてくださいね。</p>
-
-        <p>それでは、また次回の更新でお会いしましょう！最後まで読んでいただきありがとうございました。</p>
-
-    </main>
-
-    <div id="overlay">
-        <h2 id="overlay-title"></h2>
-        <p id="overlay-desc"></p>
-        <div id="deep-message" class="deep-text" style="display: none;"></div>
-        <button class="overlay-btn" id="restart-btn" onclick="location.reload()">最初からやり直す</button>
+<div class="window">
+    <div class="title-bar">
+        <span>🔍 NAME_SEARCH_EXPLORER.EXE</span>
+        <button class="btn-close" tabindex="-1">X</button>
     </div>
+    
+    <div class="content">
+        <fieldset>
+            <legend>発掘パラメータ</legend>
+            <div class="control-panel">
+                <div class="input-group">
+                    <label for="target-word">探したい名前:</label>
+                    <input type="text" id="target-word" value="たなか" maxlength="10">
+                </div>
+                <div class="input-group">
+                    <label for="generate-count">生成行数:</label>
+                    <select id="generate-count">
+                        <option value="1000">1,000 行</option>
+                        <option value="5000">5,000 行</option>
+                        <option value="10000" selected>10,000 行</option>
+                        <option value="30000">30,000 行</option>
+                    </select>
+                </div>
+                <button class="btn-execute" id="btn-run">発掘を開始する</button>
+            </div>
+        </fieldset>
 
-    <script>
-        // --- 異変広告（正解） ---
-        const abnormalAds = [
-            {
-                id: 'ab1',
-                html: `<h3>【完全無料】</h3><p>お客様の口座へ毎月 -5,000円 をご入金いたします。おめでとうございます！</p><button>支払いを確定する</button>`
-            },
-            {
-                id: 'ab2',
-                html: `<h3>[着信中...]</h3><p>大変丁寧なご請求です。先ほどのお支払いが完了いたしました。ご利用ありがとうございます。</p><button>電話に出ない</button>`
-            },
-            {
-                id: 'ab3',
-                html: `<h3>軽量化成功！</h3><p>不要な広告をすべて削除しました。現在、あなたのデバイスは安全に監視されています。</p><button>さらに削除する</button>`
-            },
-            {
-                id: 'ab4',
-                html: `<h3>⚠️絶対クリック禁止</h3><p>この先は安全すぎて不安になります。何も起きないことを完全に保証します。</p><button>クリックしない</button>`
-            },
-            {
-                id: 'ab5',
-                html: `<h3>【期間限定】大特価</h3><p>通常価格 0円 のところ、今なら特別価格 19,800円！このチャンスをお見逃しなく。</p><button>今すぐ買う</button>`
-            },
-            {
-                id: 'ab6',
-                style: 'text-align: right;',
-                html: `<h3>お疲れ様でございます</h3><p>誠に恐縮ではございますが、貴様のご訪問を心よりお待ち申し上げておりました。</p><button>承知いたしました</button>`
-            },
-            {
-                id: 'ab7',
-                html: `<h3>【最高級の虚無】</h3><p>圧倒的な「無」をあなたに。送料無料で何もお届けしません。</p><button>カートに入れる</button>`
+        <div class="status-bar">
+            <span id="stat-generated">生成: 0 行</span>
+            <span id="stat-hits" style="color: #c00000;">発見数: 0 個</span>
+        </div>
+
+        <!-- 画面分割レイアウト -->
+        <div class="main-layout">
+            <!-- 左：文字列出力 -->
+            <div class="output-container" id="output-screen">ここに30文字の文字列が大量出力されます。</div>
+            
+            <!-- 右：何行目か調べられる奴 -->
+            <div class="navigator-container">
+                <div class="navigator-header">🎯 発見した行の一覧</div>
+                <div class="navigator-list" id="nav-list">
+                    <div style="color:#888; text-align:center; padding-top:20px; font-size:12px;">ここにヒットした行番号が並びます</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function() {
+        const hiraganaList = "あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん";
+        const stringLength = 30;
+
+        const btnRun = document.getElementById('btn-run');
+        const targetInput = document.getElementById('target-word');
+        const countSelect = document.getElementById('generate-count');
+        const outputScreen = document.getElementById('output-screen');
+        const navList = document.getElementById('nav-list');
+        
+        const statGenerated = document.getElementById('stat-generated');
+        const statHits = document.getElementById('stat-hits');
+
+        btnRun.addEventListener('click', () => {
+            const targetWord = targetInput.value.trim();
+            const totalLines = parseInt(countSelect.value, 10);
+
+            if (!targetWord) {
+                alert('名前を入力してください。');
+                return;
             }
-        ];
 
-        // --- 正常広告（トラップ/ゲームオーバー） ---
-        const normalAds = [
-            {
-                id: 'nm1',
-                html: `<h3>【話題沸騰】酵素サプリ</h3><p>毎朝スッキリ！新成分配合。初回限定500円でお試しいただけます。</p><button>詳細を見る</button>`
-            },
-            {
-                id: 'nm2',
-                html: `<h3>全世界1000万DL突破！</h3><p>超王道の放置系RPG。今なら新規登録でSSRキャラ確定＆100連ガチャ無料！</p><button>今すぐプレイ</button>`
-            },
-            {
-                id: 'nm3',
-                style: 'border-left: 5px solid #ff9900; text-align: left;',
-                html: `<h3 style="color:#333; font-size:1rem;">おすすめの商品</h3><p style="margin-bottom:5px;">ノイズキャンセリング ワイヤレスイヤホン 防水 防滴</p><p style="color:#B12704; font-weight:bold; font-size:1.2rem; margin:0 0 10px 0;">￥4,980</p><button style="background:#ffd814; color:#0f1111; padding:8px 15px; border-radius:8px;">Amazonで見る</button>`
-            },
-            {
-                id: 'nm4',
-                html: `<h3>映画・アニメが見放題</h3><p>最新作から名作まで。31日間の無料トライアル実施中。いつでも解約可能です。</p><button>無料体験を始める</button>`
-            },
-            {
-                id: 'nm5',
-                html: `<h3>スマホで簡単！副業</h3><p>スキマ時間でお小遣い稼ぎ。未経験でも月収10万円を目指せる！？登録無料。</p><button>詳細はこちら</button>`
-            },
-            {
-                id: 'nm6',
-                html: `<h3>新規入会キャンペーン</h3><p>年会費永年無料！最短5分でカード発行。今なら最大8,000ポイントプレゼント。</p><button>申し込む</button>`
-            },
-            {
-                id: 'nm7',
-                html: `<h3>【衝撃】あの芸能人も？</h3><p>SNSで話題騒然。年齢より若く見える人が秘密にしている謎の美容液の正体とは…</p><button>記事を読む</button>`
-            }
-        ];
+            outputScreen.innerHTML = "生成およびインデックス解析中...";
+            navList.innerHTML = "";
 
-        // ゲームステータス
-        let totalAbnormalities = abnormalAds.length;
-        let foundCount = 0;
-        let isGameOver = false;
+            setTimeout(() => {
+                executeMining(targetWord, totalLines);
+            }, 50);
+        });
 
-        // 配列をシャッフルする関数
-        function shuffleArray(array) {
-            for (let i = array.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [array[i], array[j]] = [array[j], array[i]];
-            }
-            return array;
-        }
+        function executeMining(keyword, maxLines) {
+            let hitCount = 0;
+            const fragmentStrings = [];
+            const navButtons = [];
+            const hLen = hiraganaList.length;
 
-        // ゲーム初期化
-        function initGame() {
-            // 広告を統合してシャッフル
-            let allAds = [];
-            abnormalAds.forEach(ad => allAds.push({ ...ad, type: 'abnormal' }));
-            normalAds.forEach(ad => allAds.push({ ...ad, type: 'normal' }));
-            allAds = shuffleArray(allAds);
-
-            // スロットに広告を配置
-            const slots = document.querySelectorAll('.ad-slot');
-            slots.forEach((slot, index) => {
-                if (index < allAds.length) {
-                    const adData = allAds[index];
-                    
-                    const adLabel = document.createElement('span');
-                    adLabel.className = 'ad-label';
-                    adLabel.innerText = 'スポンサーリンク';
-                    
-                    const adBox = document.createElement('div');
-                    adBox.className = 'ad-box';
-                    adBox.dataset.type = adData.type;
-                    if (adData.style) adBox.style.cssText = adData.style;
-                    adBox.innerHTML = adData.html;
-
-                    // クリックイベントの追加
-                    adBox.addEventListener('click', function() {
-                        handleAdClick(this, adData.type);
-                    });
-
-                    slot.appendChild(adLabel);
-                    slot.appendChild(adBox);
+            for (let i = 0; i < maxLines; i++) {
+                const lineNumber = i + 1;
+                let randomRow = "";
+                for (let j = 0; j < stringLength; j++) {
+                    randomRow += hiraganaList.charAt(Math.floor(Math.random() * hLen));
                 }
-            });
 
-            updateProgress();
-        }
+                if (randomRow.includes(keyword)) {
+                    const matches = randomRow.split(keyword).length - 1;
+                    hitCount += matches;
 
-        // クリック判定
-        function handleAdClick(element, type) {
-            if (isGameOver) return;
-
-            if (type === 'abnormal') {
-                if (!element.classList.contains('found')) {
-                    element.classList.add('found');
-                    foundCount++;
-                    updateProgress();
+                    // 行ごとの一意のID（jump-target-行番号）を設定
+                    const highlighted = randomRow.split(keyword).join(`<span class="highlight">${keyword}</span>`);
+                    fragmentStrings.push(`<div class="row-data hit" id="jump-target-${lineNumber}"><span class="line-number">[行:${lineNumber}]</span>${highlighted}</div>`);
                     
-                    if (foundCount >= totalAbnormalities) {
-                        gameClear();
-                    }
+                    // 右側の「何行目か調べられる奴」リスト用のボタン要素を生成
+                    navButtons.push(`<button class="nav-item" onclick="window.jumpToLine(${lineNumber})">⚡ ${lineNumber}行目で発見！</button>`);
+                } else {
+                    fragmentStrings.push(`<div class="row-data" id="jump-target-${lineNumber}"><span class="line-number">[行:${lineNumber}]</span>${randomRow}</div>`);
                 }
-            } else if (type === 'normal') {
-                gameOver();
             }
+
+            // 画面への一括反映
+            outputScreen.innerHTML = fragmentStrings.join('');
+            
+            if (navButtons.length > 0) {
+                navList.innerHTML = navButtons.join('');
+            } else {
+                navList.innerHTML = `<div style="color:#888; text-align:center; padding-top:20px; font-size:12px;">1つも見つかりませんでした</div>`;
+            }
+
+            // カウンター更新
+            statGenerated.innerText = `生成: ${maxLines.toLocaleString()} 行`;
+            statHits.innerText = `発見数: ${hitCount.toLocaleString()} 個`;
         }
 
-        // 進捗の更新
-        function updateProgress() {
-            document.getElementById('progress').innerText = `異変広告 ${foundCount} / ${totalAbnormalities} 発見`;
-        }
+        // 指定の行番号へスクロール＆フラッシュさせる関数をグローバルに展開
+        window.jumpToLine = function(num) {
+            const targetElement = document.getElementById(`jump-target-${num}`);
+            if (targetElement) {
+                // 左の出力画面内でスクロール移動
+                targetElement.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                
+                // どこにジャンプしたか分かりやすくするために一瞬オレンジ色に光らせる
+                targetElement.classList.add('flash');
+                setTimeout(() => {
+                    targetElement.classList.remove('flash');
+                }, 800);
+            }
+        };
+    })();
+</script>
 
-        // ゲームオーバー処理
-        function gameOver() {
-            isGameOver = true;
-            const overlay = document.getElementById('overlay');
-            overlay.className = 'active game-over';
-            
-            document.getElementById('overlay-title').innerText = 'ご利用ありがとうございました';
-            document.getElementById('overlay-desc').innerText = '正常な広告がクリックされました。支払いが完了しました。';
-            document.getElementById('deep-message').style.display = 'none';
-        }
-
-        // ゲームクリア処理
-        function gameClear() {
-            isGameOver = true;
-            const overlay = document.getElementById('overlay');
-            overlay.className = 'active clear';
-            
-            document.getElementById('overlay-title').innerText = 'すべての異変広告を発見しました';
-            document.getElementById('overlay-desc').innerText = 'このブログに潜む違和感は、すべて排除されました。';
-            
-            const deepMsg = document.getElementById('deep-message');
-            deepMsg.style.display = 'block';
-            deepMsg.innerText = '「あなたはもう、現実の逆詐欺を見抜けていますか？」';
-            
-            document.getElementById('restart-btn').innerText = '日常に戻る';
-        }
-
-        // 実行
-        window.onload = initGame;
-    </script>
 </body>
 </html>
