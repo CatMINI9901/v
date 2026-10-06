@@ -6,73 +6,66 @@
   <title>Animated QR Receiver</title>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
   <style>
-    body { font-family: sans-serif; text-align: center; padding: 10px; margin: 0; background: #f0f0f0; }
-    #videoContainer { position: relative; display: inline-block; width: 100%; max-width: 400px; background: #000; }
-    /* カメラ映像をちゃんと画面に表示するお！ */
-    video { width: 100%; height: auto; display: block; }
-    canvas { display: none; } /* 解析用キャンバスだけ隠すお */
-    #status { font-weight: bold; margin: 10px; color: #0066cc; }
-    .progress-bar { width: 90%; max-width: 400px; background: #ccc; height: 16px; margin: 10px auto; border-radius: 8px; overflow: hidden; }
-    .progress-fill { width: 0%; height: 100%; background: #4caf50; transition: width 0.2s; }
-    #result { margin: 15px auto; padding: 10px; border: 1px solid #ccc; background: #fff; text-align: left; width: 90%; max-width: 400px; word-break: break-all; min-height: 50px; }
+    body { font-family: sans-serif; text-align: center; padding: 10px; margin: 0; }
+    video { width: 100%; max-width: 350px; height: auto; border: 2px solid #333; }
+    canvas { display: none; }
+    #rawLog { background: #ffebee; color: #c62828; padding: 10px; margin: 10px; border: 1px solid #e57373; font-weight: bold; word-break: break-all; }
+    #result { background: #e8f5e9; color: #2e7d32; padding: 10px; margin: 10px; border: 1px solid #81c784; font-size: 1.2em; word-break: break-all; }
   </style>
 </head>
 <body>
-  <h2>QR受信カメラ</h2>
+  <h2>QR受信カメラ (デバッグ版)</h2>
   <button id="startCamBtn" style="padding: 10px 20px; font-size: 16px;">カメラ起動</button>
-  <p id="status">ボタンを押してカメラを起動してね</p>
+  <p id="status">ボタンを押してください</p>
 
-  <div class="progress-bar">
-    <div id="progressFill" class="progress-fill"></div>
-  </div>
-
-  <div id="videoContainer">
-    <video id="video" playsinline></video>
-  </div>
+  <video id="video" playsinline></video>
   <canvas id="hiddenCanvas"></canvas>
 
-  <h3>復元結果:</h3>
-  <div id="result">ここに復元されたテキストが出ます</div>
+  <div>
+    <strong>▼ カメラが検知した生のデータ:</strong>
+    <div id="rawLog">（まだ何も検出していません）</div>
+  </div>
+
+  <div>
+    <strong>▼ 復元結果:</strong>
+    <div id="result">（未完成）</div>
+  </div>
 
   <script>
     const video = document.getElementById('video');
     const canvas = document.getElementById('hiddenCanvas');
     const ctx = canvas.getContext('2d');
     const status = document.getElementById('status');
+    const rawLog = document.getElementById('rawLog');
     const resultDiv = document.getElementById('result');
-    const progressFill = document.getElementById('progressFill');
 
     let receivedChunks = {};
     let totalChunks = null;
     let isScanning = false;
-    let isCompleted = false;
 
     document.getElementById('startCamBtn').addEventListener('click', async () => {
       receivedChunks = {};
       totalChunks = null;
-      isCompleted = false;
-      resultDiv.textContent = '受信待ち...';
-      progressFill.style.width = '0%';
+      rawLog.textContent = '（スキャン中...）';
+      resultDiv.textContent = '（未完成）';
 
       try {
-        // カメラ設定（PCでもスマホでも動くように柔軟に指定）
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: { ideal: 'environment' } }
         });
         video.srcObject = stream;
-        video.setAttribute('playsinline', true); // iOS Safari対策
         await video.play();
         
         isScanning = true;
-        status.textContent = 'カメラ起動OK！送信画面のQRコードにかざしてね';
+        status.textContent = 'カメラ動作中！画面にかざしてね';
         requestAnimationFrame(tick);
       } catch (err) {
-        alert('カメラ起動エラー: ' + err.name + '\n' + err.message);
+        alert('エラー: ' + err.name + '\n' + err.message);
       }
     });
 
     function tick() {
-      if (video.readyState === video.HAVE_ENOUGH_DATA && isScanning && !isCompleted) {
+      if (video.readyState === video.HAVE_ENOUGH_DATA && isScanning) {
         canvas.height = video.videoHeight;
         canvas.width = video.videoWidth;
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -83,11 +76,13 @@
         });
 
         if (code && code.data) {
+          // 何か読めたら即座に画面に表示！
+          rawLog.textContent = code.data;
           parseQRData(code.data);
         }
       }
 
-      if (isScanning && !isCompleted) {
+      if (isScanning) {
         requestAnimationFrame(tick);
       }
     }
@@ -106,13 +101,9 @@
         receivedChunks[current] = content;
 
         const currentCount = Object.keys(receivedChunks).length;
-        const percent = Math.floor((currentCount / total) * 100);
-
-        status.textContent = `受信中: ${currentCount} / ${total} コマ (${percent}%)`;
-        progressFill.style.width = percent + '%';
+        status.textContent = `取得済み: ${currentCount} / ${total}`;
 
         if (currentCount === total) {
-          isCompleted = true;
           assembleData();
         }
       }
@@ -123,8 +114,7 @@
       for (let i = 1; i <= totalChunks; i++) {
         fullText += receivedChunks[i] || '';
       }
-      resultDiv.textContent = fullText;
-      status.textContent = '🎉 受信完了！全データを復元したお！';
+      resultDiv.textContent = fullText + ' 🎉(完成！)';
     }
   </script>
 </body>
