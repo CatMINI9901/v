@@ -2,31 +2,37 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>Animated QR Receiver (Looping Support)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Animated QR Receiver</title>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
   <style>
-    body { font-family: sans-serif; text-align: center; padding: 20px; }
-    video, canvas { display: none; }
-    #status { font-weight: bold; font-size: 1.1em; color: #0066cc; }
-    #result { margin-top: 20px; padding: 15px; border: 1px solid #ccc; background: #f9f9f9; text-align: left; display: inline-block; width: 80%; white-space: pre-wrap; word-break: break-all; }
-    .progress-bar { width: 80%; background: #e0e0e0; height: 20px; margin: 10px auto; border-radius: 10px; overflow: hidden; }
+    body { font-family: sans-serif; text-align: center; padding: 10px; margin: 0; background: #f0f0f0; }
+    #videoContainer { position: relative; display: inline-block; width: 100%; max-width: 400px; background: #000; }
+    /* カメラ映像をちゃんと画面に表示するお！ */
+    video { width: 100%; height: auto; display: block; }
+    canvas { display: none; } /* 解析用キャンバスだけ隠すお */
+    #status { font-weight: bold; margin: 10px; color: #0066cc; }
+    .progress-bar { width: 90%; max-width: 400px; background: #ccc; height: 16px; margin: 10px auto; border-radius: 8px; overflow: hidden; }
     .progress-fill { width: 0%; height: 100%; background: #4caf50; transition: width 0.2s; }
+    #result { margin: 15px auto; padding: 10px; border: 1px solid #ccc; background: #fff; text-align: left; width: 90%; max-width: 400px; word-break: break-all; min-height: 50px; }
   </style>
 </head>
 <body>
-  <h2>QRデータ受信画面（ループ・コマ落ち対応）</h2>
-  <button id="startCamBtn">カメラ起動</button>
-  <p id="status">停止中</p>
+  <h2>QR受信カメラ</h2>
+  <button id="startCamBtn" style="padding: 10px 20px; font-size: 16px;">カメラ起動</button>
+  <p id="status">ボタンを押してカメラを起動してね</p>
 
   <div class="progress-bar">
     <div id="progressFill" class="progress-fill"></div>
   </div>
 
-  <video id="video" playsinline></video>
+  <div id="videoContainer">
+    <video id="video" playsinline></video>
+  </div>
   <canvas id="hiddenCanvas"></canvas>
 
   <h3>復元結果:</h3>
-  <div id="result">データを受信していません</div>
+  <div id="result">ここに復元されたテキストが出ます</div>
 
   <script>
     const video = document.getElementById('video');
@@ -36,28 +42,32 @@
     const resultDiv = document.getElementById('result');
     const progressFill = document.getElementById('progressFill');
 
-    let receivedChunks = {}; // 取得済みコマのバッファ { 1: "内容", 3: "内容", ... }
+    let receivedChunks = {};
     let totalChunks = null;
     let isScanning = false;
     let isCompleted = false;
 
     document.getElementById('startCamBtn').addEventListener('click', async () => {
-      // 初期化
       receivedChunks = {};
       totalChunks = null;
       isCompleted = false;
-      resultDiv.textContent = '受信中...';
+      resultDiv.textContent = '受信待ち...';
       progressFill.style.width = '0%';
 
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        // カメラ設定（PCでもスマホでも動くように柔軟に指定）
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' } }
+        });
         video.srcObject = stream;
-        video.play();
+        video.setAttribute('playsinline', true); // iOS Safari対策
+        await video.play();
+        
         isScanning = true;
-        status.textContent = 'スキャン中... QRコードにかざしてください（読み飛ばしても次のループで補完します）';
+        status.textContent = 'カメラ起動OK！送信画面のQRコードにかざしてね';
         requestAnimationFrame(tick);
       } catch (err) {
-        alert('カメラの起動に失敗しました: ' + err);
+        alert('カメラ起動エラー: ' + err.name + '\n' + err.message);
       }
     });
 
@@ -83,7 +93,6 @@
     }
 
     function parseQRData(data) {
-      // フォーマットチェック "コマ番号/総コマ数:データ"
       const match = data.match(/^(\d+)\/(\d+):([\s\S]*)$/);
       if (!match) return;
 
@@ -93,18 +102,15 @@
 
       totalChunks = total;
 
-      // 1. まだ持ってないコマだった場合のみ追加保存するお！
       if (!receivedChunks[current]) {
         receivedChunks[current] = content;
 
         const currentCount = Object.keys(receivedChunks).length;
         const percent = Math.floor((currentCount / total) * 100);
 
-        // UI更新
-        status.textContent = `受信中: ${currentCount} / ${total} コマ獲得 (${percent}%) - 読み残しはループで回収中`;
+        status.textContent = `受信中: ${currentCount} / ${total} コマ (${percent}%)`;
         progressFill.style.width = percent + '%';
 
-        // 2. 抜け漏れなく全コマが揃ったか判定するお！
         if (currentCount === total) {
           isCompleted = true;
           assembleData();
@@ -113,18 +119,12 @@
     }
 
     function assembleData() {
-      // コマ番号（1〜total）の順に結合して完成させるお！
       let fullText = '';
       for (let i = 1; i <= totalChunks; i++) {
         fullText += receivedChunks[i] || '';
       }
       resultDiv.textContent = fullText;
-      status.textContent = '🎉 全コマの回収が完了しました！データを復元しました。';
-      
-      // カメラ停止
-      if (video.srcObject) {
-        video.srcObject.getTracks().forEach(track => track.stop());
-      }
+      status.textContent = '🎉 受信完了！全データを復元したお！';
     }
   </script>
 </body>
